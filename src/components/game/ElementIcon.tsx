@@ -3,10 +3,11 @@ import { Leaf, Flame, Mountain, Hammer, Droplets } from 'lucide-react';
 
 interface ElementIconProps {
   element: Element;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
 }
 
 const sizeMap = {
+  xs: 'w-3 h-3',
   sm: 'w-4 h-4',
   md: 'w-6 h-6',
   lg: 'w-12 h-12',

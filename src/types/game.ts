@@ -20,6 +20,31 @@ export interface Card {
 
 export type Screen = 'menu' | 'deck' | 'how-to-play' | 'battle';
 
+export type TurnPhase = 'player_action' | 'resolving' | 'opponent_turn' | 'drawing';
+
+export interface CombatLogEntry {
+  id: string;
+  timestamp: number;
+  turn: number;
+  actor: 'player' | 'opponent' | 'system';
+  action: string;
+  details: Record<string, unknown>;
+  stateDelta?: {
+    playerFace?: number;
+    playerFavor?: number;
+    playerPoise?: number;
+    opponentFace?: number;
+    opponentFavor?: number;
+    patience?: number;
+  };
+}
+
+export interface StateHistoryEntry {
+  label: string;
+  state: GameState;
+  timestamp: number;
+}
+
 export interface GameState {
   player: {
     face: number;
@@ -35,7 +60,7 @@ export interface GameState {
     face: number;
     maxFace: number;
     favor: number;
-    isShocked: number; 
+    isShocked: number;
     currentIntention: Intention | null;
   };
   patience: number;
@@ -43,4 +68,6 @@ export interface GameState {
   history: Element[];
   isGameOver: boolean;
   winner: 'player' | 'opponent' | null;
+  turnNumber?: number;
+  turnPhase?: TurnPhase;
 }

@@ -1,17 +1,32 @@
 import { GameState, Card, Element } from '../types/game';
+import { combatLogger } from './debug/combatLogger';
 
 type DrawCardsFunction = (state: GameState, count: number) => GameState;
 
 export const processTurn = (state: GameState, card: Card, drawCards: DrawCardsFunction): GameState => {
+  const beforeState = state;
   let nextState = { ...state };
-  
+
+  // Update logger turn
+  combatLogger.setTurn(state.turnNumber ?? 1);
+
   // 1. Flow Calculation
   const isBalanced = checkBalanced(state.lastElement, card.element);
   const isChaos = checkChaos(state.lastElement, card.element);
+  const flowType = isBalanced ? 'balanced' : isChaos ? 'chaos' : 'neutral';
 
   // 2. Resource Costs
-  const finalPatienceCost = isBalanced ? Math.max(0, card.patienceCost - 1) : card.patienceCost;
-  const finalFaceCost = isChaos ? card.faceCost + 10 : card.faceCost;
+  // Balanced: -1 patience cost
+  // Chaos: +2 patience cost, +5 face cost (high risk)
+  let finalPatienceCost = card.patienceCost;
+  let finalFaceCost = card.faceCost;
+
+  if (isBalanced) {
+    finalPatienceCost = Math.max(0, card.patienceCost - 1);
+  } else if (isChaos) {
+    finalPatienceCost = card.patienceCost + 2;
+    finalFaceCost = card.faceCost + 5;
+  }
 
   nextState.patience -= finalPatienceCost;
   nextState.player.face -= finalFaceCost;
@@ -20,27 +35,57 @@ export const processTurn = (state: GameState, card: Card, drawCards: DrawCardsFu
   // Pass drawCards function to card effects that need it
   nextState = card.effect(nextState, drawCards);
 
-  // 4. Chaos Bonus
+  // 4. Chaos Bonus (high reward)
+  // Chaos flow: +10 favor, deal 8 direct damage to opponent
   if (isChaos) {
-    nextState.player.favor = Math.min(100, nextState.player.favor + 5); 
+    nextState.player.favor = Math.min(100, nextState.player.favor + 10);
+    nextState.opponent.face -= 8;
   }
 
   // 5. Update State
   nextState.lastElement = card.element;
-  
+
   // 6. Shock Mechanic
   if (nextState.opponent.face <= 0) {
     nextState.opponent.isShocked = 3;
     nextState.opponent.face = nextState.opponent.maxFace / 2;
-    nextState.opponent.currentIntention = { name: "Stunned", type: "shocked", value: 0 };
+    nextState.opponent.currentIntention = { name: 'Stunned', type: 'shocked', value: 0 };
+    combatLogger.logSystemEvent('Opponent Shocked', { turnsRemaining: 3 });
   }
 
-  return checkVictory(nextState);
+  const finalState = checkVictory(nextState);
+
+  // Log the card play
+  combatLogger.logCardPlayed(
+    card.name,
+    card.element,
+    { patience: finalPatienceCost, face: finalFaceCost },
+    flowType,
+    beforeState,
+    finalState
+  );
+
+  if (finalState.isGameOver) {
+    combatLogger.logSystemEvent('Game Over', { winner: finalState.winner });
+  }
+
+  return finalState;
 };
 
 export const resolveAIAction = (state: GameState): GameState => {
+  const beforeState = state;
+
   if (state.isGameOver || state.opponent.isShocked > 0) {
-    return { ...state, opponent: { ...state.opponent, isShocked: Math.max(0, state.opponent.isShocked - 1) } };
+    const nextState = {
+      ...state,
+      opponent: { ...state.opponent, isShocked: Math.max(0, state.opponent.isShocked - 1) },
+    };
+    if (state.opponent.isShocked > 0) {
+      combatLogger.logSystemEvent('Opponent Still Shocked', {
+        turnsRemaining: Math.max(0, state.opponent.isShocked - 1),
+      });
+    }
+    return nextState;
   }
 
   let next = { ...state };
@@ -61,7 +106,24 @@ export const resolveAIAction = (state: GameState): GameState => {
   }
 
   // Check victory conditions including opponent favor
-  return checkVictory(next);
+  const finalState = checkVictory(next);
+
+  // Log the AI action
+  if (intention) {
+    combatLogger.logAIAction(
+      intention.name,
+      intention.type,
+      intention.value,
+      beforeState,
+      finalState
+    );
+  }
+
+  if (finalState.isGameOver) {
+    combatLogger.logSystemEvent('Game Over', { winner: finalState.winner });
+  }
+
+  return finalState;
 };
 
 const checkBalanced = (last: Element | null, current: Element) => {
