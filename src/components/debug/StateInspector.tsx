@@ -46,7 +46,7 @@ export default function StateInspector({ state, deckInfo }: StateInspectorProps)
         <div className="grid grid-cols-2 gap-2">
           <div>Face: {state.opponent.face}/{state.opponent.maxFace}</div>
           <div>Favor: {state.opponent.favor}/100</div>
-          <div>Shocked: {state.opponent.isShocked > 0 ? `${state.opponent.isShocked} turns` : 'No'}</div>
+          <div>Patience Spent: {state.opponent.patienceSpent}</div>
           <div>Intent: {state.opponent.currentIntention?.name ?? 'None'}</div>
         </div>
       </div>

@@ -1,4 +1,3 @@
-import { useGameLogic } from '../../hooks/useGameLogic';
 import BattleLayout from './battle/BattleLayout';
 import WuxingIndicator from './battle/WuxingIndicator';
 import OpponentInfoPanel from './battle/OpponentInfoPanel';
@@ -7,15 +6,21 @@ import PlayerInfoPanel from './battle/PlayerInfoPanel';
 import DeckDisplay from './battle/DeckDisplay';
 import HandDisplay from './battle/HandDisplay';
 import ActionBar from './battle/ActionBar';
-import GameOverOverlay from './battle/GameOverOverlay';
+import CampaignProgress from './battle/CampaignProgress';
 import DebugPanel from '../debug/DebugPanel';
+import { GameState, Card, SessionState } from '../../types/game';
+import { DebugInterface } from '../../hooks/useGameLogic';
 
 interface BattleArenaProps {
   onBack: () => void;
+  session: SessionState;
+  state: GameState;
+  playCard: (card: Card) => void;
+  endTurn: () => void;
+  debug: DebugInterface;
 }
 
-export default function BattleArena({ onBack }: BattleArenaProps) {
-  const { state, playCard, endTurn, debug } = useGameLogic();
+export default function BattleArena({ onBack, session, state, playCard, endTurn, debug }: BattleArenaProps) {
 
   return (
     <BattleLayout
@@ -27,8 +32,10 @@ export default function BattleArena({ onBack }: BattleArenaProps) {
           face={state.opponent.face}
           maxFace={state.opponent.maxFace}
           favor={state.opponent.favor}
-          isShocked={state.opponent.isShocked}
+          patienceSpent={state.opponent.patienceSpent}
           currentIntention={state.opponent.currentIntention}
+          nextIntention={state.opponent.nextIntention}
+          canSeeNextIntention={state.player.canSeeNextIntention}
         />
       }
       judgePanel={
@@ -37,6 +44,10 @@ export default function BattleArena({ onBack }: BattleArenaProps) {
           maxPatience={40}
           playerFavor={state.player.favor}
           opponentFavor={state.opponent.favor}
+          judgeEffects={state.judge.effects}
+          nextJudgeAction={state.judge.nextEffect}
+          patienceThreshold={state.judge.patienceThreshold}
+          patienceSpent={state.judge.patienceSpent}
         />
       }
       playerPanel={
@@ -64,9 +75,10 @@ export default function BattleArena({ onBack }: BattleArenaProps) {
         <ActionBar
           onEndTurn={endTurn}
           disabled={state.isGameOver}
+          patienceCost={state.judge.effects.endTurnPatienceCost}
         />
       }
-      overlay={state.isGameOver ? <GameOverOverlay winner={state.winner} onBack={onBack} /> : undefined}
+      campaignProgress={<CampaignProgress session={session} />}
       debugPanel={
         <DebugPanel
           state={state}

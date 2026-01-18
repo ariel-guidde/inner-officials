@@ -1,7 +1,16 @@
-import { GameState, Card, Element } from '../types/game';
+import { GameState, Card, Element, Intention, JudgeEffects } from '../types/game';
 import { combatLogger } from './debug/combatLogger';
+import { OPPONENTS, JUDGE_ACTIONS, FLUSTERED_EFFECTS } from '../data/opponents';
 
 type DrawCardsFunction = (state: GameState, count: number) => GameState;
+
+// Default judge effects
+export const DEFAULT_JUDGE_EFFECTS: JudgeEffects = {
+  endTurnPatienceCost: 1,
+  elementCostModifier: {},
+  favorGainModifier: 1.0,
+  damageModifier: 1.0,
+};
 
 export const processTurn = (state: GameState, card: Card, drawCards: DrawCardsFunction): GameState => {
   const beforeState = state;
@@ -15,42 +24,68 @@ export const processTurn = (state: GameState, card: Card, drawCards: DrawCardsFu
   const isChaos = checkChaos(state.lastElement, card.element);
   const flowType = isBalanced ? 'balanced' : isChaos ? 'chaos' : 'neutral';
 
-  // 2. Resource Costs
-  // Balanced: -1 patience cost
-  // Chaos: +2 patience cost, +5 face cost (high risk)
-  let finalPatienceCost = card.patienceCost;
+  // 2. Resource Costs (with judge modifiers)
+  const judgeEffects = state.judge?.effects ?? DEFAULT_JUDGE_EFFECTS;
+  const elementModifier = judgeEffects.elementCostModifier[card.element] ?? 0;
+
+  let finalPatienceCost = card.patienceCost + elementModifier;
   let finalFaceCost = card.faceCost;
 
   if (isBalanced) {
-    finalPatienceCost = Math.max(0, card.patienceCost - 1);
+    finalPatienceCost = Math.max(0, finalPatienceCost - 1);
   } else if (isChaos) {
-    finalPatienceCost = card.patienceCost + 2;
-    finalFaceCost = card.faceCost + 5;
+    finalPatienceCost = finalPatienceCost + 2;
+    finalFaceCost = finalFaceCost + 5;
   }
 
   nextState.patience -= finalPatienceCost;
-  nextState.player.face -= finalFaceCost;
+  nextState.player = { ...nextState.player, face: nextState.player.face - finalFaceCost };
 
-  // 3. Effect Application
-  // Pass drawCards function to card effects that need it
+  // 3. Track patience spent for opponent and judge triggers
+  nextState = trackPatienceSpent(nextState, finalPatienceCost);
+
+  // 4. Effect Application
   nextState = card.effect(nextState, drawCards);
 
-  // 4. Chaos Bonus (high reward)
-  // Chaos flow: +10 favor, deal 8 direct damage to opponent
-  if (isChaos) {
-    nextState.player.favor = Math.min(100, nextState.player.favor + 10);
-    nextState.opponent.face -= 8;
+  // 5. Apply favor gain modifier
+  const favorGained = nextState.player.favor - beforeState.player.favor;
+  if (favorGained > 0 && judgeEffects.favorGainModifier !== 1.0) {
+    const modifiedGain = Math.floor(favorGained * judgeEffects.favorGainModifier);
+    nextState.player = {
+      ...nextState.player,
+      favor: Math.min(100, beforeState.player.favor + modifiedGain),
+    };
   }
 
-  // 5. Update State
+  // 6. Chaos Bonus (high reward)
+  if (isChaos) {
+    const chaosFavor = Math.floor(10 * judgeEffects.favorGainModifier);
+    const chaosDamage = Math.floor(8 * judgeEffects.damageModifier);
+    nextState.player = {
+      ...nextState.player,
+      favor: Math.min(100, nextState.player.favor + chaosFavor),
+    };
+    nextState.opponent = {
+      ...nextState.opponent,
+      face: nextState.opponent.face - chaosDamage,
+    };
+  }
+
+  // 7. Update State
   nextState.lastElement = card.element;
 
-  // 6. Shock Mechanic
+  // 8. Flustered Mechanic - when opponent face breaks, push flustered to top of intentions
   if (nextState.opponent.face <= 0) {
-    nextState.opponent.isShocked = 3;
-    nextState.opponent.face = nextState.opponent.maxFace / 2;
-    nextState.opponent.currentIntention = { name: 'Stunned', type: 'shocked', value: 0 };
-    combatLogger.logSystemEvent('Opponent Shocked', { turnsRemaining: 3 });
+    const flustered = pickRandomFlustered();
+    nextState.opponent = {
+      ...nextState.opponent,
+      face: Math.floor(nextState.opponent.maxFace / 2),
+      // Push flustered to current, move current to next (losing the old next)
+      nextIntention: nextState.opponent.currentIntention,
+      currentIntention: flustered,
+      patienceSpent: 0, // Reset patience tracking for the new flustered intention
+    };
+    combatLogger.logSystemEvent('Opponent Flustered', { effect: flustered.name });
   }
 
   const finalState = checkVictory(nextState);
@@ -72,58 +107,145 @@ export const processTurn = (state: GameState, card: Card, drawCards: DrawCardsFu
   return finalState;
 };
 
-export const resolveAIAction = (state: GameState): GameState => {
+// Track patience spent and trigger opponent/judge actions when thresholds are reached
+const trackPatienceSpent = (state: GameState, patienceSpent: number): GameState => {
+  let nextState = { ...state };
+
+  // Track for opponent intention
+  const newOpponentPatienceSpent = (nextState.opponent.patienceSpent || 0) + patienceSpent;
+  nextState.opponent = { ...nextState.opponent, patienceSpent: newOpponentPatienceSpent };
+
+  // Check if opponent intention should trigger
+  if (nextState.opponent.currentIntention) {
+    const threshold = nextState.opponent.currentIntention.patienceThreshold;
+    if (newOpponentPatienceSpent >= threshold) {
+      nextState = executeOpponentAction(nextState, nextState.opponent.currentIntention);
+      // Move to next intention
+      const template = OPPONENTS.find((o) => o.name === nextState.opponent.name);
+      if (template) {
+        nextState.opponent = {
+          ...nextState.opponent,
+          currentIntention: nextState.opponent.nextIntention || pickRandomIntention(template.intentions),
+          nextIntention: pickRandomIntention(template.intentions),
+          patienceSpent: 0, // Reset tracking
+        };
+      }
+    }
+  }
+
+  // Track for judge
+  const newJudgePatienceSpent = (nextState.judge?.patienceSpent || 0) + patienceSpent;
+  if (nextState.judge) {
+    nextState.judge = { ...nextState.judge, patienceSpent: newJudgePatienceSpent };
+
+    // Check if judge action should trigger
+    if (nextState.judge.nextEffect && newJudgePatienceSpent >= nextState.judge.patienceThreshold) {
+      const judgeAction = JUDGE_ACTIONS.find((a) => a.name === nextState.judge.nextEffect);
+      if (judgeAction) {
+        const newEffects = judgeAction.apply(nextState.judge.effects);
+        const newAction = pickRandomJudgeAction();
+        combatLogger.log('judge', `${judgeAction.name}`, { description: judgeAction.description });
+
+        nextState.judge = {
+          effects: newEffects,
+          nextEffect: newAction.name,
+          patienceThreshold: newAction.patienceThreshold,
+          patienceSpent: 0, // Reset tracking
+        };
+      }
+    }
+  }
+
+  return nextState;
+};
+
+// Process end of turn - costs patience, resets composure
+export const processEndTurn = (state: GameState): GameState => {
+  let nextState = { ...state };
+  const judgeEffects = state.judge?.effects ?? DEFAULT_JUDGE_EFFECTS;
+
+  // 1. End turn costs patience
+  const endTurnCost = judgeEffects.endTurnPatienceCost;
+  nextState.patience -= endTurnCost;
+
+  combatLogger.log('system', `End Turn (-${endTurnCost} patience)`, { cost: endTurnCost });
+
+  // 2. Track patience spent for opponent and judge triggers
+  nextState = trackPatienceSpent(nextState, endTurnCost);
+
+  // 3. Reset composure (poise) at end of turn
+  nextState.player = {
+    ...nextState.player,
+    poise: 0,
+  };
+
+  return checkVictory(nextState);
+};
+
+// Execute opponent action (separated from cooldown logic)
+const executeOpponentAction = (state: GameState, intention: Intention): GameState => {
   const beforeState = state;
+  let nextState = { ...state };
+  const judgeEffects = state.judge?.effects ?? DEFAULT_JUDGE_EFFECTS;
 
-  if (state.isGameOver || state.opponent.isShocked > 0) {
-    const nextState = {
-      ...state,
-      opponent: { ...state.opponent, isShocked: Math.max(0, state.opponent.isShocked - 1) },
+  if (intention.type === 'attack') {
+    const baseDamage = Math.floor(intention.value * judgeEffects.damageModifier);
+    const damage = Math.max(0, baseDamage - nextState.player.poise);
+    nextState.player = {
+      ...nextState.player,
+      poise: Math.max(0, nextState.player.poise - baseDamage),
+      face: nextState.player.face - damage,
     };
-    if (state.opponent.isShocked > 0) {
-      combatLogger.logSystemEvent('Opponent Still Shocked', {
-        turnsRemaining: Math.max(0, state.opponent.isShocked - 1),
-      });
-    }
-    return nextState;
+  } else if (intention.type === 'favor') {
+    const favorSteal = intention.value;
+    nextState.player = {
+      ...nextState.player,
+      favor: Math.max(0, nextState.player.favor - favorSteal),
+    };
+    nextState.opponent = {
+      ...nextState.opponent,
+      favor: Math.min(100, nextState.opponent.favor + favorSteal),
+    };
+  } else if (intention.type === 'stall') {
+    nextState.patience -= intention.value;
+  } else if (intention.type === 'flustered') {
+    // Flustered does nothing - opponent wastes their action
+    combatLogger.logSystemEvent('Opponent Flustered', { effect: intention.name });
   }
 
-  let next = { ...state };
-  const intention = state.opponent.currentIntention;
+  combatLogger.logAIAction(
+    intention.name,
+    intention.type,
+    intention.value,
+    beforeState,
+    nextState
+  );
 
-  if (intention) {
-    if (intention.type === 'attack') {
-      const damage = Math.max(0, intention.value - next.player.poise);
-      next.player.poise = Math.max(0, next.player.poise - intention.value);
-      next.player.face -= damage;
-    } else if (intention.type === 'favor') {
-      // Opponent reduces player favor and gains favor themselves
-      next.player.favor = Math.max(0, next.player.favor - intention.value);
-      next.opponent.favor = Math.min(100, next.opponent.favor + intention.value);
-    } else if (intention.type === 'stall') {
-      next.patience -= intention.value;
-    }
-  }
+  return nextState;
+};
 
-  // Check victory conditions including opponent favor
-  const finalState = checkVictory(next);
+// Pick a random intention from the pool
+const pickRandomIntention = (intentions: Intention[]): Intention => {
+  const index = Math.floor(Math.random() * intentions.length);
+  return { ...intentions[index] }; // Clone to avoid mutation
+};
 
-  // Log the AI action
-  if (intention) {
-    combatLogger.logAIAction(
-      intention.name,
-      intention.type,
-      intention.value,
-      beforeState,
-      finalState
-    );
-  }
+// Pick a random flustered effect
+const pickRandomFlustered = (): Intention => {
+  const index = Math.floor(Math.random() * FLUSTERED_EFFECTS.length);
+  return { ...FLUSTERED_EFFECTS[index] };
+};
 
-  if (finalState.isGameOver) {
-    combatLogger.logSystemEvent('Game Over', { winner: finalState.winner });
-  }
+// Pick a random judge action
+const pickRandomJudgeAction = () => {
+  const index = Math.floor(Math.random() * JUDGE_ACTIONS.length);
+  return JUDGE_ACTIONS[index];
+};
 
-  return finalState;
+// Legacy function for compatibility - now just checks state
+export const resolveAIAction = (state: GameState): GameState => {
+  // This is now handled by processEndTurn
+  return state;
 };
 
 const checkBalanced = (last: Element | null, current: Element) => {

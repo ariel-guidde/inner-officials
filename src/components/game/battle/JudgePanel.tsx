@@ -1,19 +1,74 @@
-import { motion } from 'framer-motion';
-import { Hourglass, Sparkles, Scale } from 'lucide-react';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Hourglass, Sparkles, Scale, Gavel, AlertTriangle, Flame, Droplets } from 'lucide-react';
+import { JudgeEffects } from '../../../types/game';
 
 interface JudgePanelProps {
   patience: number;
   maxPatience: number;
   playerFavor: number;
   opponentFavor: number;
+  judgeEffects: JudgeEffects;
+  nextJudgeAction: string | null;
+  patienceThreshold: number;
+  patienceSpent: number;
 }
 
-export default function JudgePanel({ patience, maxPatience, playerFavor, opponentFavor }: JudgePanelProps) {
+export default function JudgePanel({
+  patience,
+  maxPatience,
+  playerFavor,
+  opponentFavor,
+  judgeEffects,
+  nextJudgeAction,
+  patienceThreshold,
+  patienceSpent,
+}: JudgePanelProps) {
+  const patienceRemaining = Math.max(0, patienceThreshold - patienceSpent);
+  const [showEffectsTooltip, setShowEffectsTooltip] = useState(false);
   const patiencePercent = (patience / maxPatience) * 100;
   const patienceColor = patiencePercent > 50 ? 'bg-amber-500' : patiencePercent > 25 ? 'bg-orange-500' : 'bg-red-500';
 
   const favorDiff = playerFavor - opponentFavor;
   const favorAdvantage = favorDiff > 0 ? 'player' : favorDiff < 0 ? 'opponent' : 'tie';
+
+  // Check for active modifiers
+  const hasActiveModifiers =
+    judgeEffects.endTurnPatienceCost !== 1 ||
+    judgeEffects.favorGainModifier !== 1.0 ||
+    judgeEffects.damageModifier !== 1.0 ||
+    Object.keys(judgeEffects.elementCostModifier).length > 0;
+
+  const getActiveModifiersText = () => {
+    const mods: string[] = [];
+    if (judgeEffects.endTurnPatienceCost !== 1) {
+      mods.push(`End turn costs ${judgeEffects.endTurnPatienceCost} patience`);
+    }
+    if (judgeEffects.favorGainModifier !== 1.0) {
+      const percent = Math.round((judgeEffects.favorGainModifier - 1) * 100);
+      mods.push(`Favor gains ${percent > 0 ? '+' : ''}${percent}%`);
+    }
+    if (judgeEffects.damageModifier !== 1.0) {
+      const percent = Math.round((judgeEffects.damageModifier - 1) * 100);
+      mods.push(`All damage ${percent > 0 ? '+' : ''}${percent}%`);
+    }
+    if (judgeEffects.elementCostModifier.fire) {
+      mods.push(`Fire cards +${judgeEffects.elementCostModifier.fire} patience`);
+    }
+    if (judgeEffects.elementCostModifier.water) {
+      mods.push(`Water cards +${judgeEffects.elementCostModifier.water} patience`);
+    }
+    if (judgeEffects.elementCostModifier.wood) {
+      mods.push(`Wood cards +${judgeEffects.elementCostModifier.wood} patience`);
+    }
+    if (judgeEffects.elementCostModifier.earth) {
+      mods.push(`Earth cards +${judgeEffects.elementCostModifier.earth} patience`);
+    }
+    if (judgeEffects.elementCostModifier.metal) {
+      mods.push(`Metal cards +${judgeEffects.elementCostModifier.metal} patience`);
+    }
+    return mods;
+  };
 
   return (
     <div className="bg-stone-900/60 border border-stone-700 rounded-2xl p-6 backdrop-blur-sm max-w-md mx-auto">
@@ -24,11 +79,12 @@ export default function JudgePanel({ patience, maxPatience, playerFavor, opponen
       </div>
 
       {/* Patience */}
-      <div className="mb-6">
+      <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Hourglass className="w-4 h-4 text-amber-500" />
-            <span className="text-sm text-stone-300">Patience Remaining</span>
+            <span className="text-sm text-stone-300">Patience</span>
+            <span className="text-xs text-stone-500">(-{judgeEffects.endTurnPatienceCost}/turn)</span>
           </div>
           <span className="text-lg font-mono text-amber-400">{patience}</span>
         </div>
@@ -44,6 +100,68 @@ export default function JudgePanel({ patience, maxPatience, playerFavor, opponen
           </div>
         )}
       </div>
+
+      {/* Active Judge Effects */}
+      {hasActiveModifiers && (
+        <div
+          className="mb-4 relative"
+          onMouseEnter={() => setShowEffectsTooltip(true)}
+          onMouseLeave={() => setShowEffectsTooltip(false)}
+        >
+          <div className="flex items-center gap-2 px-3 py-2 bg-amber-900/30 border border-amber-700/50 rounded-lg cursor-help">
+            <AlertTriangle className="w-4 h-4 text-amber-400" />
+            <span className="text-xs text-amber-300">Active Decrees</span>
+            <div className="ml-auto flex gap-1">
+              {judgeEffects.endTurnPatienceCost > 1 && (
+                <Hourglass className="w-3 h-3 text-amber-400" />
+              )}
+              {judgeEffects.favorGainModifier !== 1.0 && (
+                <Sparkles className="w-3 h-3 text-purple-400" />
+              )}
+              {judgeEffects.elementCostModifier.fire && (
+                <Flame className="w-3 h-3 text-red-400" />
+              )}
+              {judgeEffects.elementCostModifier.water && (
+                <Droplets className="w-3 h-3 text-blue-400" />
+              )}
+            </div>
+          </div>
+          <AnimatePresence>
+            {showEffectsTooltip && (
+              <motion.div
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -5 }}
+                className="absolute left-0 right-0 top-full mt-2 p-3 bg-stone-800 border border-stone-600 rounded-lg text-xs z-50 shadow-xl"
+              >
+                <div className="font-medium text-amber-200 mb-2">Current Effects:</div>
+                <ul className="space-y-1 text-stone-300">
+                  {getActiveModifiersText().map((mod, i) => (
+                    <li key={i}>• {mod}</li>
+                  ))}
+                </ul>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {/* Upcoming Judge Action */}
+      {nextJudgeAction && (
+        <div className="mb-4 px-3 py-2 bg-stone-800/50 border border-stone-700 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Gavel className="w-4 h-4 text-stone-400" />
+              <span className="text-xs text-stone-400">Next Decree:</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs bg-stone-900/60 px-1.5 py-0.5 rounded">
+              <Hourglass className="w-3 h-3 text-stone-400" />
+              <span className="text-stone-300">{patienceRemaining}</span>
+            </div>
+          </div>
+          <div className="text-sm text-amber-200 mt-1">{nextJudgeAction}</div>
+        </div>
+      )}
 
       {/* Favor Comparison */}
       <div>

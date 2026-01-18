@@ -16,8 +16,9 @@ interface BattleLayoutProps {
   // Bottom center
   hand: React.ReactNode;
   actionBar: React.ReactNode;
-  // Overlays
-  overlay?: React.ReactNode;
+  // Campaign progress indicator
+  campaignProgress?: React.ReactNode;
+  // Debug panel
   debugPanel?: React.ReactNode;
 }
 
@@ -30,7 +31,7 @@ export default function BattleLayout({
   deckDisplay,
   hand,
   actionBar,
-  overlay,
+  campaignProgress,
   debugPanel,
 }: BattleLayoutProps) {
   return (
@@ -52,6 +53,13 @@ export default function BattleLayout({
             </button>
             {wuxingIndicator}
           </div>
+
+          {/* Top Center: Campaign Progress */}
+          {campaignProgress && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2">
+              {campaignProgress}
+            </div>
+          )}
 
           {/* Top Right: Opponent */}
           <div>{opponentPanel}</div>
@@ -80,9 +88,6 @@ export default function BattleLayout({
 
       {/* Hand - fixed at bottom center */}
       {hand}
-
-      {/* Game Over Overlay */}
-      {overlay}
 
       {/* Debug Panel */}
       {debugPanel}

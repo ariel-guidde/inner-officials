@@ -35,6 +35,10 @@ const ELEMENT_BG: Record<Element, string> = {
   water: 'bg-gradient-to-b from-blue-950 to-stone-900',
 };
 
+// Bad card styling
+const BAD_CARD_BORDER = 'border-rose-900';
+const BAD_CARD_BG = 'bg-gradient-to-b from-rose-950/80 via-stone-950 to-stone-900';
+
 export default function CardInHand({
   card,
   canAfford,
@@ -44,8 +48,17 @@ export default function CardInHand({
   onPlay,
   onHover,
 }: CardInHandProps) {
-  const borderColor = canAfford ? ELEMENT_BORDERS[card.element] : 'border-stone-700';
-  const bgColor = canAfford ? ELEMENT_BG[card.element] : 'bg-stone-900';
+  const isBadCard = card.isBad === true;
+  const borderColor = isBadCard
+    ? BAD_CARD_BORDER
+    : canAfford
+      ? ELEMENT_BORDERS[card.element]
+      : 'border-stone-700';
+  const bgColor = isBadCard
+    ? BAD_CARD_BG
+    : canAfford
+      ? ELEMENT_BG[card.element]
+      : 'bg-stone-900';
 
   return (
     <motion.div
@@ -95,11 +108,19 @@ export default function CardInHand({
           ${canAfford ? 'cursor-pointer hover:border-amber-400' : 'opacity-60 cursor-not-allowed'}
         `}
       >
+        {/* Bad card indicator */}
+        {isBadCard && (
+          <div className="absolute -top-1 -right-1 bg-rose-800 text-rose-100 text-[8px] font-bold px-1.5 py-0.5 rounded-full border border-rose-600 shadow-lg">
+            BAD
+          </div>
+        )}
+
         {/* Top: Name and Cost */}
         <div className="flex items-start justify-between gap-1 mb-1">
           <div className="flex items-center gap-1 min-w-0 flex-1">
-            <ElementIcon element={card.element} size="xs" />
-            <span className="text-xs font-medium text-stone-100 truncate leading-tight">
+            {!isBadCard && <ElementIcon element={card.element} size="xs" />}
+            {isBadCard && <span className="text-xs">💀</span>}
+            <span className={`text-xs font-medium truncate leading-tight ${isBadCard ? 'text-rose-200' : 'text-stone-100'}`}>
               {card.name}
             </span>
           </div>

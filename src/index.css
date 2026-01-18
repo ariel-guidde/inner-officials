@@ -1,3 +1,177 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ============================================
+   Inner Officials - Design System
+   ============================================ */
+
+@layer components {
+  /* Panel styles - used for info containers */
+  .panel {
+    @apply bg-stone-900/80 border border-stone-700 rounded-xl backdrop-blur-sm;
+  }
+
+  .panel-sm {
+    @apply bg-stone-900/80 border border-stone-700 rounded-lg backdrop-blur-sm;
+  }
+
+  .panel-inner {
+    @apply bg-stone-800/50 rounded-xl;
+  }
+
+  /* Button styles */
+  .btn-primary {
+    @apply px-4 py-3 bg-amber-600 hover:bg-amber-500 text-amber-100 rounded-xl transition-colors flex items-center justify-center gap-2;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-3 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-xl transition-colors flex items-center justify-center gap-2;
+  }
+
+  .btn-danger {
+    @apply px-4 py-3 bg-rose-600 hover:bg-rose-500 text-rose-100 rounded-xl transition-colors flex items-center justify-center gap-2;
+  }
+
+  .btn-icon {
+    @apply p-2 hover:bg-stone-800 rounded-lg transition-colors;
+  }
+
+  /* Badge styles */
+  .badge {
+    @apply text-[10px] font-mono px-1.5 py-0.5 rounded;
+  }
+
+  .badge-default {
+    @apply badge bg-stone-800/80 text-stone-300;
+  }
+
+  .badge-danger {
+    @apply badge bg-red-900/50 text-red-400;
+  }
+
+  .badge-warning {
+    @apply badge bg-amber-900/50 text-amber-400;
+  }
+
+  .badge-success {
+    @apply badge bg-green-900/50 text-green-400;
+  }
+
+  /* Progress bar styles */
+  .progress-bar {
+    @apply h-1.5 bg-stone-800 rounded-full overflow-hidden;
+  }
+
+  .progress-bar-lg {
+    @apply h-2 bg-stone-800 rounded-full overflow-hidden;
+  }
+
+  /* Text styles */
+  .text-heading {
+    @apply text-lg font-medium text-amber-100;
+  }
+
+  .text-subheading {
+    @apply text-sm font-medium text-stone-100;
+  }
+
+  .text-label {
+    @apply text-xs text-stone-400;
+  }
+
+  .text-label-small {
+    @apply text-[10px] uppercase tracking-wider text-stone-500;
+  }
+
+  .text-value {
+    @apply text-xs font-mono text-stone-300;
+  }
+
+  /* Card styles */
+  .game-card {
+    @apply w-32 h-44 border-2 rounded-xl p-2 text-left flex flex-col shadow-xl transition-colors;
+  }
+
+  .game-card-playable {
+    @apply game-card cursor-pointer hover:border-amber-400;
+  }
+
+  .game-card-disabled {
+    @apply game-card opacity-60 cursor-not-allowed;
+  }
+
+  /* Stat row - for displaying label + value pairs */
+  .stat-row {
+    @apply flex items-center justify-between;
+  }
+
+  .stat-row-label {
+    @apply flex items-center gap-1.5 text-label;
+  }
+
+  /* Element colors */
+  .element-wood {
+    @apply border-green-600 bg-gradient-to-b from-green-950 to-stone-900;
+  }
+
+  .element-fire {
+    @apply border-red-600 bg-gradient-to-b from-red-950 to-stone-900;
+  }
+
+  .element-earth {
+    @apply border-yellow-600 bg-gradient-to-b from-yellow-950 to-stone-900;
+  }
+
+  .element-metal {
+    @apply border-slate-400 bg-gradient-to-b from-slate-900 to-stone-900;
+  }
+
+  .element-water {
+    @apply border-blue-600 bg-gradient-to-b from-blue-950 to-stone-900;
+  }
+
+  /* Bad card styling */
+  .card-bad {
+    @apply border-rose-900 bg-gradient-to-b from-rose-950/80 via-stone-950 to-stone-900;
+  }
+
+  /* Intention styling */
+  .intention-attack {
+    @apply border-red-500/50 bg-red-500/10 text-red-400;
+  }
+
+  .intention-favor {
+    @apply border-purple-500/50 bg-purple-500/10 text-purple-400;
+  }
+
+  .intention-stall {
+    @apply border-amber-500/50 bg-amber-500/10 text-amber-400;
+  }
+
+  .intention-flustered {
+    @apply border-blue-500/50 bg-blue-500/10 text-blue-400;
+  }
+
+  /* Overlay/Modal backdrop */
+  .overlay-backdrop {
+    @apply fixed inset-0 bg-black/60 flex items-center justify-center z-50;
+  }
+
+  /* Icon colors */
+  .icon-face {
+    @apply text-rose-500;
+  }
+
+  .icon-favor {
+    @apply text-purple-500;
+  }
+
+  .icon-poise {
+    @apply text-cyan-500;
+  }
+
+  .icon-patience {
+    @apply text-amber-500;
+  }
+}

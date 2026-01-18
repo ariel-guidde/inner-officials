@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Swords, Sparkles, Hourglass, Zap } from 'lucide-react';
+import { Heart, Swords, Sparkles, Hourglass, Zap, HelpCircle } from 'lucide-react';
 import { Intention } from '../../../types/game';
 
 interface OpponentInfoPanelProps {
@@ -8,8 +8,10 @@ interface OpponentInfoPanelProps {
   face: number;
   maxFace: number;
   favor: number;
-  isShocked: number;
+  patienceSpent: number;
   currentIntention: Intention | null;
+  nextIntention: Intention | null;
+  canSeeNextIntention: boolean;
 }
 
 const OPPONENT_SPRITES: Record<string, string> = {
@@ -24,21 +26,21 @@ const INTENTION_ICONS: Record<string, React.ReactNode> = {
   attack: <Swords className="w-4 h-4 text-red-400" />,
   favor: <Sparkles className="w-4 h-4 text-purple-400" />,
   stall: <Hourglass className="w-4 h-4 text-amber-400" />,
-  shocked: <Zap className="w-4 h-4 text-blue-400" />,
+  flustered: <Zap className="w-4 h-4 text-blue-400" />,
 };
 
 const INTENTION_COLORS: Record<string, string> = {
-  attack: 'border-red-500/50 bg-red-500/10 text-red-400',
-  favor: 'border-purple-500/50 bg-purple-500/10 text-purple-400',
-  stall: 'border-amber-500/50 bg-amber-500/10 text-amber-400',
-  shocked: 'border-blue-500/50 bg-blue-500/10 text-blue-400',
+  attack: 'intention-attack',
+  favor: 'intention-favor',
+  stall: 'intention-stall',
+  flustered: 'intention-flustered',
 };
 
-const INTENTION_DESCRIPTIONS: Record<string, (value: number) => string> = {
-  attack: (value) => `Will deal ${value} damage to your Face (reduced by your Composure)`,
-  favor: (value) => `Will steal ${value} Favor from you and gain it themselves`,
-  stall: (value) => `Will reduce Patience by ${value}, speeding up the judgment`,
-  shocked: () => `Stunned and cannot act this turn`,
+const INTENTION_DESCRIPTIONS: Record<string, (value: number, remaining: number) => string> = {
+  attack: (value, remaining) => `Will deal ${value} damage to your Face (reduced by Composure) after ${remaining} more patience spent`,
+  favor: (value, remaining) => `Will steal ${value} Favor from you after ${remaining} more patience spent`,
+  stall: (value, remaining) => `Will reduce Patience by ${value} after ${remaining} more patience spent`,
+  flustered: () => `Opponent is flustered and will waste their action`,
 };
 
 export default function OpponentInfoPanel({
@@ -46,25 +48,30 @@ export default function OpponentInfoPanel({
   face,
   maxFace,
   favor,
-  isShocked,
+  patienceSpent,
   currentIntention,
+  nextIntention,
+  canSeeNextIntention,
 }: OpponentInfoPanelProps) {
   const [showTooltip, setShowTooltip] = useState(false);
+  const [showNextTooltip, setShowNextTooltip] = useState(false);
   const facePercent = (face / maxFace) * 100;
   const sprite = OPPONENT_SPRITES[name] || '👤';
 
-  const getIntentionDescription = () => {
-    if (isShocked > 0) {
-      return INTENTION_DESCRIPTIONS.shocked(0);
+  const patienceRemaining = currentIntention
+    ? Math.max(0, currentIntention.patienceThreshold - patienceSpent)
+    : 0;
+
+  const getIntentionDescription = (intention: Intention | null, remaining?: number) => {
+    if (!intention) return '';
+    if (intention.type === 'flustered') {
+      return INTENTION_DESCRIPTIONS.flustered(0, 0);
     }
-    if (currentIntention) {
-      return INTENTION_DESCRIPTIONS[currentIntention.type]?.(currentIntention.value) || '';
-    }
-    return '';
+    return INTENTION_DESCRIPTIONS[intention.type]?.(intention.value, remaining ?? intention.patienceThreshold) || '';
   };
 
   return (
-    <div className="bg-stone-900/80 border border-stone-700 rounded-xl p-4 backdrop-blur-sm w-56">
+    <div className="panel p-4 w-56">
       {/* Header with sprite */}
       <div className="flex items-center gap-3 mb-3">
         <div className="w-12 h-12 rounded-full bg-stone-800 border border-stone-600 flex items-center justify-center text-2xl">
@@ -78,14 +85,14 @@ export default function OpponentInfoPanel({
 
       {/* Face */}
       <div className="mb-2">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-1.5">
-            <Heart className="w-3 h-3 text-rose-500" />
-            <span className="text-xs text-stone-400">Face</span>
+        <div className="stat-row mb-1">
+          <div className="stat-row-label">
+            <Heart className="w-3 h-3 icon-face" />
+            <span>Face</span>
           </div>
-          <span className="text-xs font-mono text-stone-300">{face}/{maxFace}</span>
+          <span className="text-value">{face}/{maxFace}</span>
         </div>
-        <div className="h-1.5 bg-stone-800 rounded-full overflow-hidden">
+        <div className="progress-bar">
           <motion.div
             animate={{ width: `${facePercent}%` }}
             className="h-full bg-rose-500"
@@ -95,14 +102,14 @@ export default function OpponentInfoPanel({
 
       {/* Favor */}
       <div className="mb-3">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-1.5">
-            <Sparkles className="w-3 h-3 text-purple-500" />
-            <span className="text-xs text-stone-400">Favor</span>
+        <div className="stat-row mb-1">
+          <div className="stat-row-label">
+            <Sparkles className="w-3 h-3 icon-favor" />
+            <span>Favor</span>
           </div>
-          <span className="text-xs font-mono text-stone-300">{favor}/100</span>
+          <span className="text-value">{favor}/100</span>
         </div>
-        <div className="h-1.5 bg-stone-800 rounded-full overflow-hidden">
+        <div className="progress-bar">
           <motion.div
             animate={{ width: `${favor}%` }}
             className="h-full bg-purple-500"
@@ -110,9 +117,11 @@ export default function OpponentInfoPanel({
         </div>
       </div>
 
-      {/* Intention */}
+      {/* Intentions */}
       <div className="border-t border-stone-700 pt-3 relative">
-        <div className="text-[10px] uppercase tracking-wider text-stone-500 mb-2">Intention</div>
+        <div className="text-label-small mb-2">Intentions</div>
+
+        {/* Current Intention */}
         <AnimatePresence mode="wait">
           <motion.div
             key={currentIntention?.name}
@@ -122,29 +131,26 @@ export default function OpponentInfoPanel({
             onMouseEnter={() => setShowTooltip(true)}
             onMouseLeave={() => setShowTooltip(false)}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-help ${
-              isShocked > 0
-                ? INTENTION_COLORS.shocked
-                : INTENTION_COLORS[currentIntention?.type || 'attack']
+              INTENTION_COLORS[currentIntention?.type || 'attack']
             }`}
           >
-            {isShocked > 0 ? (
-              <>
-                {INTENTION_ICONS.shocked}
-                <span className="text-sm">Shocked ({isShocked})</span>
-              </>
-            ) : (
-              <>
-                {INTENTION_ICONS[currentIntention?.type || 'attack']}
-                <span className="text-sm">{currentIntention?.name}</span>
-                {currentIntention && currentIntention.value > 0 && (
-                  <span className="text-xs opacity-70 ml-auto">{currentIntention.value}</span>
-                )}
-              </>
+            {INTENTION_ICONS[currentIntention?.type || 'attack']}
+            <div className="flex-1 min-w-0">
+              <span className="text-sm">{currentIntention?.name}</span>
+              {currentIntention && currentIntention.value > 0 && (
+                <span className="text-xs opacity-70 ml-2">{currentIntention.value}</span>
+              )}
+            </div>
+            {currentIntention && currentIntention.type !== 'flustered' && (
+              <div className="flex items-center gap-1 text-xs bg-stone-900/60 px-1.5 py-0.5 rounded">
+                <Hourglass className="w-3 h-3" />
+                <span>{patienceRemaining}</span>
+              </div>
             )}
           </motion.div>
         </AnimatePresence>
 
-        {/* Tooltip */}
+        {/* Tooltip for current */}
         <AnimatePresence>
           {showTooltip && (
             <motion.div
@@ -153,10 +159,49 @@ export default function OpponentInfoPanel({
               exit={{ opacity: 0, y: -5 }}
               className="absolute left-0 right-0 top-full mt-2 p-2 bg-stone-800 border border-stone-600 rounded-lg text-xs text-stone-300 z-50 shadow-xl"
             >
-              {getIntentionDescription()}
+              {getIntentionDescription(currentIntention, patienceRemaining)}
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Next Intention (hidden or revealed) */}
+        <div className="mt-2 relative">
+          <div className="text-label-small text-stone-600 mb-1">Next</div>
+          {canSeeNextIntention && nextIntention ? (
+            <motion.div
+              onMouseEnter={() => setShowNextTooltip(true)}
+              onMouseLeave={() => setShowNextTooltip(false)}
+              className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border cursor-help opacity-70 ${
+                INTENTION_COLORS[nextIntention.type]
+              }`}
+            >
+              {INTENTION_ICONS[nextIntention.type]}
+              <span className="text-xs">{nextIntention.name}</span>
+              {nextIntention.value > 0 && (
+                <span className="text-[10px] opacity-70 ml-auto">{nextIntention.value}</span>
+              )}
+            </motion.div>
+          ) : (
+            <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-stone-700 bg-stone-800/50 text-stone-500">
+              <HelpCircle className="w-3 h-3" />
+              <span className="text-xs">???</span>
+            </div>
+          )}
+
+          {/* Tooltip for next */}
+          <AnimatePresence>
+            {showNextTooltip && canSeeNextIntention && nextIntention && (
+              <motion.div
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -5 }}
+                className="absolute left-0 right-0 top-full mt-2 p-2 bg-stone-800 border border-stone-600 rounded-lg text-xs text-stone-300 z-50 shadow-xl"
+              >
+                {getIntentionDescription(nextIntention)}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </div>
   );

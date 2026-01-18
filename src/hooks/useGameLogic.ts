@@ -1,38 +1,72 @@
 import { useCallback, useMemo } from 'react';
-import { GameState, Card, Intention, StateHistoryEntry } from '../types/game';
+import { GameState, Card, StateHistoryEntry, Intention } from '../types/game';
 import { DEBATE_DECK } from '../data/cards';
-import { OPPONENTS } from '../data/opponents';
-import { processTurn, resolveAIAction } from '../lib/engine';
+import { OPPONENTS, JUDGE_ACTIONS } from '../data/opponents';
+import { processTurn, processEndTurn, DEFAULT_JUDGE_EFFECTS } from '../lib/engine';
 import { useDeck } from './useDeck';
 import { useGameState } from './useGameState';
 import { useTurnFlow } from './useTurnFlow';
 
 const INITIAL_HAND_SIZE = 5;
+const MAX_DECK_SIZE = 20;
+const DEFAULT_MAX_FACE = 60;
 
-function createInitialState(): GameState {
-  const shuffledDeck = [...DEBATE_DECK].sort(() => Math.random() - 0.5);
-  const opponentTemplate = OPPONENTS[0]; // Start with the Concubine
+function pickRandomIntention(intentions: Intention[]): Intention {
+  const index = Math.floor(Math.random() * intentions.length);
+  return { ...intentions[index] };
+}
+
+export interface BattleConfig {
+  playerStartingFace?: number;
+  opponentIndex?: number;
+}
+
+function createInitialState(config: BattleConfig = {}): GameState {
+  const { playerStartingFace = DEFAULT_MAX_FACE, opponentIndex = 0 } = config;
+
+  // Limit deck to MAX_DECK_SIZE cards
+  const limitedDeck = [...DEBATE_DECK].slice(0, MAX_DECK_SIZE);
+  const shuffledDeck = limitedDeck.sort(() => Math.random() - 0.5);
+
+  // Select opponent based on index (cycle through available opponents)
+  const opponentTemplate = OPPONENTS[opponentIndex % OPPONENTS.length];
 
   const initialDeck = shuffledDeck.slice(INITIAL_HAND_SIZE);
   const initialHand = shuffledDeck.slice(0, INITIAL_HAND_SIZE);
 
+  // Pick initial intentions
+  const currentIntention = pickRandomIntention(opponentTemplate.intentions);
+  const nextIntention = pickRandomIntention(opponentTemplate.intentions);
+
+  // Pick initial judge action
+  const initialJudgeAction = JUDGE_ACTIONS[Math.floor(Math.random() * JUDGE_ACTIONS.length)];
+
   return {
     player: {
-      face: 60,
-      maxFace: 60,
+      face: playerStartingFace,
+      maxFace: DEFAULT_MAX_FACE,
       favor: 0,
       poise: 0,
       hand: initialHand,
       deck: initialDeck,
       discard: [],
+      removedFromGame: [],
+      canSeeNextIntention: false,
     },
     opponent: {
       name: opponentTemplate.name,
       face: opponentTemplate.maxFace,
       maxFace: opponentTemplate.maxFace,
       favor: 0,
-      isShocked: 0,
-      currentIntention: opponentTemplate.intentions[0],
+      patienceSpent: 0,
+      currentIntention: currentIntention,
+      nextIntention: nextIntention,
+    },
+    judge: {
+      effects: { ...DEFAULT_JUDGE_EFFECTS },
+      nextEffect: initialJudgeAction.name,
+      patienceThreshold: initialJudgeAction.patienceThreshold,
+      patienceSpent: 0,
     },
     patience: 40,
     lastElement: null,
@@ -51,10 +85,10 @@ export interface DebugInterface {
   getDeckInfo: () => { deck: number; hand: number; discard: number };
 }
 
-export function useGameLogic() {
+export function useGameLogic(config: BattleConfig = {}) {
   const deck = useDeck();
   const turnFlow = useTurnFlow();
-  const { state, updateState, getHistory } = useGameState(createInitialState());
+  const { state, updateState, getHistory, resetState } = useGameState(() => createInitialState(config));
 
   const playCard = useCallback(
     (card: Card) => {
@@ -90,23 +124,12 @@ export function useGameLogic() {
       // 2. Move all cards from hand to discard
       nextState = deck.discardHand(nextState);
 
-      // 3. Resolve AI's Turn
-      nextState = resolveAIAction(nextState);
+      // 3. Process end of turn (patience cost, cooldowns, actions)
+      nextState = processEndTurn(nextState);
 
-      // 4. Update next AI Intention (Randomly pick from opponent pool)
-      if (!nextState.isGameOver && nextState.opponent.isShocked === 0) {
-        const template = OPPONENTS.find((o) => o.name === nextState.opponent.name);
-        if (template) {
-          const nextIntention: Intention =
-            template.intentions[Math.floor(Math.random() * template.intentions.length)];
-          nextState = {
-            ...nextState,
-            opponent: {
-              ...nextState.opponent,
-              currentIntention: nextIntention,
-            },
-          };
-        }
+      // 4. Check if game ended
+      if (nextState.isGameOver) {
+        return nextState;
       }
 
       // 5. Set phase to drawing
@@ -126,6 +149,20 @@ export function useGameLogic() {
     }, 'End Turn');
   }, [updateState, deck, turnFlow]);
 
+  const startNewBattle = useCallback((newConfig: BattleConfig) => {
+    resetState(createInitialState(newConfig));
+  }, [resetState]);
+
+  const getBattleResult = useCallback(() => {
+    if (!state.isGameOver) return null;
+    return {
+      won: state.winner === 'player',
+      finalFace: state.player.face,
+      opponentName: state.opponent.name,
+      favorGained: state.player.favor,
+    };
+  }, [state.isGameOver, state.winner, state.player.face, state.opponent.name, state.player.favor]);
+
   const debug: DebugInterface = useMemo(
     () => ({
       getHistory,
@@ -140,5 +177,5 @@ export function useGameLogic() {
     [getHistory, turnFlow, state]
   );
 
-  return { state, playCard, endTurn, debug };
+  return { state, playCard, endTurn, startNewBattle, getBattleResult, debug };
 }

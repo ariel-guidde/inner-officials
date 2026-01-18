@@ -7,16 +7,23 @@ export interface GameStateManager {
   setState: (state: GameState) => void;
   getHistory: () => StateHistoryEntry[];
   clearHistory: () => void;
+  resetState: (newInitialState?: GameState) => void;
 }
 
 const MAX_HISTORY_SIZE = 100;
 
-export function useGameState(initialState: GameState): GameStateManager {
-  const [state, setStateInternal] = useState<GameState>(initialState);
+export function useGameState(initialStateOrFactory: GameState | (() => GameState)): GameStateManager {
+  const getInitialState = useCallback(() => {
+    return typeof initialStateOrFactory === 'function'
+      ? initialStateOrFactory()
+      : initialStateOrFactory;
+  }, [initialStateOrFactory]);
+
+  const [state, setStateInternal] = useState<GameState>(getInitialState);
   const historyRef = useRef<StateHistoryEntry[]>([
     {
       label: 'Initial State',
-      state: initialState,
+      state: getInitialState(),
       timestamp: Date.now(),
     },
   ]);
@@ -59,11 +66,24 @@ export function useGameState(initialState: GameState): GameStateManager {
     ];
   }, [state]);
 
+  const resetState = useCallback((newInitialState?: GameState) => {
+    const newState = newInitialState ?? getInitialState();
+    setStateInternal(newState);
+    historyRef.current = [
+      {
+        label: 'Battle Reset',
+        state: newState,
+        timestamp: Date.now(),
+      },
+    ];
+  }, [getInitialState]);
+
   return {
     state,
     updateState,
     setState,
     getHistory,
     clearHistory,
+    resetState,
   };
 }
