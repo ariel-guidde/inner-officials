@@ -3,10 +3,12 @@ import { Screen } from './types/game';
 import MainMenu from './components/menu/MainMenu';
 import DeckView from './components/menu/DeckView';
 import HowToPlay from './components/menu/HowToPlay';
+import Settings from './components/menu/Settings';
 import BattleArena from './components/game/BattleArena';
 import BattleSummary from './components/game/BattleSummary';
 import { useGameLogic, BattleConfig } from './hooks/useGameLogic';
 import { useSession } from './hooks/useSession';
+import { useAudio } from './hooks/useAudio';
 
 const DEFAULT_CAMPAIGN_BATTLES = 3;
 
@@ -27,6 +29,16 @@ function App() {
   };
 
   const { state, playCard, endTurn, startNewBattle, getBattleResult, debug } = useGameLogic(battleConfig);
+  const { playBattleMusic, stopMusic } = useAudio();
+
+  // Handle battle music
+  useEffect(() => {
+    if (currentScreen === 'battle') {
+      playBattleMusic(session.currentBattle);
+    } else {
+      stopMusic();
+    }
+  }, [currentScreen, session.currentBattle, playBattleMusic, stopMusic]);
 
   // Watch for battle end to record result
   useEffect(() => {
@@ -39,7 +51,7 @@ function App() {
     }
   }, [state.isGameOver, currentScreen, getBattleResult, recordBattleResult]);
 
-  const handleNavigate = (screen: 'deck' | 'how-to-play' | 'battle') => {
+  const handleNavigate = (screen: 'deck' | 'how-to-play' | 'settings' | 'battle') => {
     if (screen === 'battle') {
       // Start new campaign
       startSession(DEFAULT_CAMPAIGN_BATTLES);
@@ -71,6 +83,8 @@ function App() {
       return <DeckView gameState={state} onBack={handleBack} />;
     case 'how-to-play':
       return <HowToPlay onBack={handleBack} />;
+    case 'settings':
+      return <Settings onBack={handleBack} />;
     case 'battle':
       return (
         <BattleArena

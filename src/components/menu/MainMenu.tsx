@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion';
-import { BookOpen, Swords, Scroll } from 'lucide-react';
+import { BookOpen, Swords, Scroll, Settings } from 'lucide-react';
 
 interface MainMenuProps {
-  onNavigate: (screen: 'deck' | 'how-to-play' | 'battle') => void;
+  onNavigate: (screen: 'deck' | 'how-to-play' | 'settings' | 'battle') => void;
 }
 
 export default function MainMenu({ onNavigate }: MainMenuProps) {
@@ -49,6 +49,19 @@ export default function MainMenu({ onNavigate }: MainMenuProps) {
             initial={{ opacity: 0, x: -50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.4, duration: 0.5 }}
+            whileHover={{ scale: 1.05, x: 10 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => onNavigate('settings')}
+            className="flex items-center gap-4 px-8 py-4 bg-stone-900 border border-stone-800 rounded-2xl hover:border-amber-600 transition-colors group"
+          >
+            <Settings className="w-6 h-6 text-amber-500 group-hover:text-amber-400" />
+            <span className="text-xl text-stone-200 group-hover:text-amber-200">Settings</span>
+          </motion.button>
+
+          <motion.button
+            initial={{ opacity: 0, x: -50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.5, duration: 0.5 }}
             whileHover={{ scale: 1.05, x: 10 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => onNavigate('battle')}

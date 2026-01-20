@@ -21,7 +21,7 @@ export interface Card {
   removeAfterPlay?: boolean; // Fire cards that burn out after use
 }
 
-export type Screen = 'menu' | 'deck' | 'how-to-play' | 'battle' | 'battle-summary';
+export type Screen = 'menu' | 'deck' | 'how-to-play' | 'settings' | 'battle' | 'battle-summary';
 
 // Session state for multi-battle campaigns
 export interface SessionState {
