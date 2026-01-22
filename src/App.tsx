@@ -28,7 +28,7 @@ function App() {
     opponentIndex: session.currentBattle - 1,
   };
 
-  const { state, playCard, endTurn, startNewBattle, getBattleResult, debug } = useGameLogic(battleConfig);
+  const { state, playCard, endTurn, startNewBattle, getBattleResult, debug, targeting, events } = useGameLogic(battleConfig);
   const { playBattleMusic, stopMusic } = useAudio();
 
   // Handle battle music
@@ -94,6 +94,8 @@ function App() {
           playCard={playCard}
           endTurn={endTurn}
           debug={debug}
+          targeting={targeting}
+          events={events}
         />
       );
     case 'battle-summary':

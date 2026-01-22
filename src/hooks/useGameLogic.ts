@@ -1,11 +1,13 @@
 import { useCallback, useMemo } from 'react';
-import { GameState, Card, StateHistoryEntry, Intention } from '../types/game';
+import { GameState, Card, StateHistoryEntry, Intention, TargetedEffectContext } from '../types/game';
 import { DEBATE_DECK } from '../data/cards';
 import { OPPONENTS, JUDGE_ACTIONS } from '../data/opponents';
-import { processTurn, processEndTurn, DEFAULT_JUDGE_EFFECTS } from '../lib/engine';
+import { processTurn, processEndTurn, processStartTurn, DEFAULT_JUDGE_EFFECTS } from '../lib/engine';
 import { useDeck } from './useDeck';
 import { useGameState } from './useGameState';
 import { useTurnFlow } from './useTurnFlow';
+import { useTargeting } from './useTargeting';
+import { useEventQueue } from './useEventQueue';
 
 const INITIAL_HAND_SIZE = 5;
 const MAX_DECK_SIZE = 20;
@@ -63,7 +65,7 @@ function createInitialState(config: BattleConfig = {}): GameState {
       nextIntention: nextIntention,
     },
     judge: {
-      effects: { ...DEFAULT_JUDGE_EFFECTS },
+      effects: { ...DEFAULT_JUDGE_EFFECTS, activeDecrees: [] },
       nextEffect: initialJudgeAction.name,
       patienceThreshold: initialJudgeAction.patienceThreshold,
       patienceSpent: 0,
@@ -75,6 +77,11 @@ function createInitialState(config: BattleConfig = {}): GameState {
     winner: null,
     turnNumber: 1,
     turnPhase: 'player_action',
+    // New systems
+    activeEffects: [],
+    boardEffects: [],
+    intentionModifiers: [],
+    pendingEvents: [],
   };
 }
 
@@ -88,10 +95,13 @@ export interface DebugInterface {
 export function useGameLogic(config: BattleConfig = {}) {
   const deck = useDeck();
   const turnFlow = useTurnFlow();
+  const targeting = useTargeting();
+  const eventQueue = useEventQueue();
   const { state, updateState, getHistory, resetState } = useGameState(() => createInitialState(config));
 
-  const playCard = useCallback(
-    (card: Card) => {
+  // Internal function to execute a card (either directly or after targeting)
+  const executeCard = useCallback(
+    (card: Card, targetContext?: TargetedEffectContext) => {
       updateState((prevState) => {
         if (prevState.isGameOver) return prevState;
         if (prevState.patience < 0) return prevState;
@@ -102,8 +112,16 @@ export function useGameLogic(config: BattleConfig = {}) {
         // Process the Player's Move (costs and effects)
         nextState = processTurn(nextState, card, deck.drawCards);
 
+        // If card has a targeted effect and we have targets, apply it
+        if (card.targetedEffect && targetContext) {
+          nextState = card.targetedEffect(nextState, targetContext, deck.drawCards);
+        }
+
         // Remove played card from hand
         nextState = deck.removeFromHand(nextState, card.id);
+
+        // Process any pending events
+        nextState = eventQueue.processEvents(nextState);
 
         // Return to player_action phase
         nextState = turnFlow.setPhase(nextState, 'player_action');
@@ -111,8 +129,42 @@ export function useGameLogic(config: BattleConfig = {}) {
         return nextState;
       }, `Play Card: ${card.name}`);
     },
-    [updateState, deck, turnFlow]
+    [updateState, deck, turnFlow, eventQueue]
   );
+
+  const playCard = useCallback(
+    (card: Card) => {
+      // Check if card requires targeting
+      if (card.targetRequirement && card.targetRequirement.type !== 'none') {
+        // Start targeting mode
+        const needsTargeting = targeting.startTargeting(card, state);
+        if (needsTargeting) {
+          // Update state to targeting phase
+          updateState((prevState) => turnFlow.setPhase(prevState, 'targeting'), 'Enter Targeting');
+          return;
+        }
+        // If optional targeting with no valid targets, proceed without targets
+      }
+
+      // Execute card directly (no targeting needed)
+      executeCard(card);
+    },
+    [state, targeting, updateState, turnFlow, executeCard]
+  );
+
+  // Confirm targeting and execute the pending card
+  const confirmTargeting = useCallback(() => {
+    const targetContext = targeting.confirmTargets();
+    if (targetContext && targeting.pendingCard) {
+      executeCard(targeting.pendingCard, targetContext);
+    }
+  }, [targeting, executeCard]);
+
+  // Cancel targeting and return to player action
+  const cancelTargeting = useCallback(() => {
+    targeting.cancelTargeting();
+    updateState((prevState) => turnFlow.setPhase(prevState, 'player_action'), 'Cancel Targeting');
+  }, [targeting, updateState, turnFlow]);
 
   const endTurn = useCallback(() => {
     updateState((prevState) => {
@@ -124,30 +176,36 @@ export function useGameLogic(config: BattleConfig = {}) {
       // 2. Move all cards from hand to discard
       nextState = deck.discardHand(nextState);
 
-      // 3. Process end of turn (patience cost, cooldowns, actions)
+      // 3. Process end of turn (patience cost, cooldowns, actions, turn_end effects)
       nextState = processEndTurn(nextState);
 
-      // 4. Check if game ended
+      // 4. Process any pending events from end of turn
+      nextState = eventQueue.processEvents(nextState);
+
+      // 5. Check if game ended
       if (nextState.isGameOver) {
         return nextState;
       }
 
-      // 5. Set phase to drawing
+      // 6. Set phase to drawing
       nextState = turnFlow.setPhase(nextState, 'drawing');
 
-      // 6. Draw new hand
+      // 7. Draw new hand
       nextState = deck.drawCards(
         { ...nextState, player: { ...nextState.player, hand: [] } },
         INITIAL_HAND_SIZE
       );
 
-      // 7. Increment turn and return to player_action
+      // 8. Increment turn and return to player_action
       nextState = turnFlow.incrementTurn(nextState);
       nextState = turnFlow.setPhase(nextState, 'player_action');
 
+      // 9. Process start of turn effects (healing, poise gain, etc.)
+      nextState = processStartTurn(nextState);
+
       return nextState;
     }, 'End Turn');
-  }, [updateState, deck, turnFlow]);
+  }, [updateState, deck, turnFlow, eventQueue]);
 
   const startNewBattle = useCallback((newConfig: BattleConfig) => {
     resetState(createInitialState(newConfig));
@@ -177,5 +235,30 @@ export function useGameLogic(config: BattleConfig = {}) {
     [getHistory, turnFlow, state]
   );
 
-  return { state, playCard, endTurn, startNewBattle, getBattleResult, debug };
+  return {
+    state,
+    playCard,
+    endTurn,
+    startNewBattle,
+    getBattleResult,
+    debug,
+    // Targeting
+    targeting: {
+      isTargeting: targeting.isTargeting,
+      pendingCard: targeting.pendingCard,
+      requirement: targeting.requirement,
+      selectedTargets: targeting.selectedTargets,
+      validTargets: targeting.validTargets,
+      selectTarget: targeting.selectTarget,
+      deselectTarget: targeting.deselectTarget,
+      confirmTargets: confirmTargeting,
+      cancelTargeting,
+      canConfirm: targeting.canConfirm,
+    },
+    // Event queue
+    events: {
+      currentEvent: eventQueue.currentEvent,
+      isBlocking: eventQueue.isBlocking,
+    },
+  };
 }

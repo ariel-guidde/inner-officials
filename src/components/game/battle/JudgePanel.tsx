@@ -101,8 +101,8 @@ export default function JudgePanel({
         )}
       </div>
 
-      {/* Active Judge Effects */}
-      {hasActiveModifiers && (
+      {/* Active Judge Effects / Accumulated Decrees */}
+      {(hasActiveModifiers || (judgeEffects.activeDecrees && judgeEffects.activeDecrees.length > 0)) && (
         <div
           className="mb-4 relative"
           onMouseEnter={() => setShowEffectsTooltip(true)}
@@ -110,7 +110,9 @@ export default function JudgePanel({
         >
           <div className="flex items-center gap-2 px-3 py-2 bg-amber-900/30 border border-amber-700/50 rounded-lg cursor-help">
             <AlertTriangle className="w-4 h-4 text-amber-400" />
-            <span className="text-xs text-amber-300">Active Decrees</span>
+            <span className="text-xs text-amber-300">
+              Active Decrees ({judgeEffects.activeDecrees?.length || 0})
+            </span>
             <div className="ml-auto flex gap-1">
               {judgeEffects.endTurnPatienceCost > 1 && (
                 <Hourglass className="w-3 h-3 text-amber-400" />
@@ -132,14 +134,31 @@ export default function JudgePanel({
                 initial={{ opacity: 0, y: -5 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -5 }}
-                className="absolute left-0 right-0 top-full mt-2 p-3 bg-stone-800 border border-stone-600 rounded-lg text-xs z-50 shadow-xl"
+                className="absolute left-0 right-0 top-full mt-2 p-3 bg-stone-800 border border-stone-600 rounded-lg text-xs z-50 shadow-xl max-h-48 overflow-y-auto"
               >
                 <div className="font-medium text-amber-200 mb-2">Current Effects:</div>
-                <ul className="space-y-1 text-stone-300">
+                <ul className="space-y-1 text-stone-300 mb-3">
                   {getActiveModifiersText().map((mod, i) => (
                     <li key={i}>• {mod}</li>
                   ))}
                 </ul>
+                {judgeEffects.activeDecrees && judgeEffects.activeDecrees.length > 0 && (
+                  <>
+                    <div className="font-medium text-amber-200 mb-2 border-t border-stone-600 pt-2">
+                      Decree History:
+                    </div>
+                    <ul className="space-y-2 text-stone-300">
+                      {judgeEffects.activeDecrees.map((decree, i) => (
+                        <li key={i} className="border-l-2 border-amber-600/50 pl-2">
+                          <div className="font-medium text-amber-100">{decree.name}</div>
+                          <div className="text-[10px] text-stone-400">
+                            Turn {decree.turnApplied} - {decree.description}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

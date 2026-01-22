@@ -1,6 +1,7 @@
-import { GameState, Card, Element, Intention, JudgeEffects } from '../types/game';
+import { GameState, Card, Element, Intention, JudgeEffects, BoardEffect, IntentionModifier, GameEvent } from '../types/game';
 import { combatLogger } from './debug/combatLogger';
 import { OPPONENTS, JUDGE_ACTIONS, FLUSTERED_EFFECTS } from '../data/opponents';
+import { processEffects, tickEffects } from './effects';
 
 type DrawCardsFunction = (state: GameState, count: number) => GameState;
 
@@ -10,7 +11,107 @@ export const DEFAULT_JUDGE_EFFECTS: JudgeEffects = {
   elementCostModifier: {},
   favorGainModifier: 1.0,
   damageModifier: 1.0,
+  activeDecrees: [],
 };
+
+// ==================== COMPOSURE BEFORE FACE ====================
+// Deduct face cost using poise (composure) first, then face
+const deductFaceCost = (state: GameState, cost: number): GameState => {
+  const poiseUsed = Math.min(state.player.poise, cost);
+  const faceCost = cost - poiseUsed;
+  return {
+    ...state,
+    player: {
+      ...state.player,
+      poise: state.player.poise - poiseUsed,
+      face: state.player.face - faceCost,
+    },
+  };
+};
+
+// ==================== BOARD EFFECTS ====================
+export const addBoardEffect = (state: GameState, effect: Omit<BoardEffect, 'id'>): GameState => {
+  const newEffect: BoardEffect = {
+    ...effect,
+    id: `be_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+  };
+  return {
+    ...state,
+    boardEffects: [...state.boardEffects, newEffect],
+  };
+};
+
+export const removeBoardEffect = (state: GameState, effectId: string): GameState => {
+  return {
+    ...state,
+    boardEffects: state.boardEffects.filter(e => e.id !== effectId),
+  };
+};
+
+// Check and consume trap effects (like negate_next_attack)
+const checkTrapEffects = (state: GameState, intention: Intention): { state: GameState; intention: Intention | null } => {
+  let nextState = { ...state };
+  let modifiedIntention: Intention | null = intention;
+
+  // Check for negate_next_attack
+  const negateEffect = nextState.boardEffects.find(e => e.effectType === 'negate_next_attack');
+  if (negateEffect && intention.type === 'attack') {
+    // Remove the effect and negate the attack
+    nextState = removeBoardEffect(nextState, negateEffect.id);
+    combatLogger.log('system', `${negateEffect.name} negated the attack!`, { effect: negateEffect.name });
+    modifiedIntention = null; // Attack is completely negated
+  }
+
+  return { state: nextState, intention: modifiedIntention };
+};
+
+// ==================== INTENTION MODIFIERS ====================
+export const addIntentionModifier = (state: GameState, modifier: Omit<IntentionModifier, 'id'>): GameState => {
+  const newModifier: IntentionModifier = {
+    ...modifier,
+    id: `im_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+  };
+  return {
+    ...state,
+    intentionModifiers: [...state.intentionModifiers, newModifier],
+  };
+};
+
+// Apply intention modifiers and consume triggers
+const applyIntentionModifiers = (state: GameState, intention: Intention): { state: GameState; intention: Intention } => {
+  let nextState = { ...state };
+  let modifiedIntention = { ...intention };
+  const remainingModifiers: IntentionModifier[] = [];
+
+  for (const modifier of nextState.intentionModifiers) {
+    modifiedIntention = modifier.modify(modifiedIntention);
+    const remaining = modifier.remainingTriggers - 1;
+    if (remaining > 0) {
+      remainingModifiers.push({ ...modifier, remainingTriggers: remaining });
+    }
+  }
+
+  nextState.intentionModifiers = remainingModifiers;
+  return { state: nextState, intention: modifiedIntention };
+};
+
+// ==================== EVENT EMISSION ====================
+export const emitGameEvent = (state: GameState, event: Omit<GameEvent, 'id'>): GameState => {
+  const newEvent: GameEvent = {
+    ...event,
+    id: `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+  };
+  return {
+    ...state,
+    pendingEvents: [...state.pendingEvents, newEvent],
+  };
+};
+
+// Helper to reveal next intention
+export const revealNextIntention = (state: GameState): GameState => ({
+  ...state,
+  player: { ...state.player, canSeeNextIntention: true },
+});
 
 export const processTurn = (state: GameState, card: Card, drawCards: DrawCardsFunction): GameState => {
   const beforeState = state;
@@ -39,7 +140,8 @@ export const processTurn = (state: GameState, card: Card, drawCards: DrawCardsFu
   }
 
   nextState.patience -= finalPatienceCost;
-  nextState.player = { ...nextState.player, face: nextState.player.face - finalFaceCost };
+  // Use composure (poise) before face for face costs
+  nextState = deductFaceCost(nextState, finalFaceCost);
 
   // 3. Track patience spent for opponent and judge triggers
   nextState = trackPatienceSpent(nextState, finalPatienceCost);
@@ -146,12 +248,29 @@ const trackPatienceSpent = (state: GameState, patienceSpent: number): GameState 
         const newAction = pickRandomJudgeAction();
         combatLogger.log('judge', `${judgeAction.name}`, { description: judgeAction.description });
 
+        // Accumulate the decree in activeDecrees
+        const newDecree = {
+          name: judgeAction.name,
+          description: judgeAction.description,
+          turnApplied: nextState.turnNumber || 1,
+        };
+
         nextState.judge = {
-          effects: newEffects,
+          effects: {
+            ...newEffects,
+            activeDecrees: [...(nextState.judge.effects.activeDecrees || []), newDecree],
+          },
           nextEffect: newAction.name,
           patienceThreshold: newAction.patienceThreshold,
           patienceSpent: 0, // Reset tracking
         };
+
+        // Emit judge decree event
+        nextState = emitGameEvent(nextState, {
+          type: 'judge_decree',
+          name: judgeAction.name,
+          description: judgeAction.description,
+        });
       }
     }
   }
@@ -159,7 +278,7 @@ const trackPatienceSpent = (state: GameState, patienceSpent: number): GameState 
   return nextState;
 };
 
-// Process end of turn - costs patience, resets composure
+// Process end of turn - costs patience, resets composure, processes effects
 export const processEndTurn = (state: GameState): GameState => {
   let nextState = { ...state };
   const judgeEffects = state.judge?.effects ?? DEFAULT_JUDGE_EFFECTS;
@@ -173,7 +292,13 @@ export const processEndTurn = (state: GameState): GameState => {
   // 2. Track patience spent for opponent and judge triggers
   nextState = trackPatienceSpent(nextState, endTurnCost);
 
-  // 3. Reset composure (poise) at end of turn
+  // 3. Process turn_end effects (e.g., wood cards that give favor at end of turn)
+  nextState = processEffects(nextState, 'turn_end');
+
+  // 4. Tick effect counters and remove expired effects
+  nextState = tickEffects(nextState);
+
+  // 5. Reset composure (poise) at end of turn
   nextState.player = {
     ...nextState.player,
     poise: 0,
@@ -182,22 +307,90 @@ export const processEndTurn = (state: GameState): GameState => {
   return checkVictory(nextState);
 };
 
+// Process start of turn - applies turn_start effects
+export const processStartTurn = (state: GameState): GameState => {
+  let nextState = { ...state };
+
+  // Process turn_start effects (e.g., healing, poise gain)
+  nextState = processEffects(nextState, 'turn_start');
+
+  return nextState;
+};
+
 // Execute opponent action (separated from cooldown logic)
 const executeOpponentAction = (state: GameState, intention: Intention): GameState => {
   const beforeState = state;
   let nextState = { ...state };
   const judgeEffects = state.judge?.effects ?? DEFAULT_JUDGE_EFFECTS;
 
-  if (intention.type === 'attack') {
-    const baseDamage = Math.floor(intention.value * judgeEffects.damageModifier);
-    const damage = Math.max(0, baseDamage - nextState.player.poise);
+  // Apply intention modifiers first (e.g., halve attack damage)
+  const modifierResult = applyIntentionModifiers(nextState, intention);
+  nextState = modifierResult.state;
+  let modifiedIntention: Intention | null = modifierResult.intention;
+
+  // Check for trap effects (e.g., negate_next_attack)
+  if (modifiedIntention) {
+    const trapResult = checkTrapEffects(nextState, modifiedIntention);
+    nextState = trapResult.state;
+    modifiedIntention = trapResult.intention;
+  }
+
+  // If intention was negated, emit event and return
+  if (!modifiedIntention) {
+    nextState = emitGameEvent(nextState, {
+      type: 'opponent_action',
+      name: intention.name,
+      description: 'Attack was negated!',
+      actionType: intention.type as 'attack' | 'favor' | 'stall',
+      value: 0,
+      statChanges: {},
+    });
+    return nextState;
+  }
+
+  // Track stat changes for event emission
+  let statChanges: { playerFace?: number; playerFavor?: number } = {};
+
+  if (modifiedIntention.type === 'attack') {
+    const baseDamage = Math.floor(modifiedIntention.value * judgeEffects.damageModifier);
+
+    // Check for on_damage active effects that reduce damage
+    let finalDamage = baseDamage;
+    const damageReductionEffects = nextState.activeEffects.filter(e => e.trigger === 'on_damage');
+    for (const effect of damageReductionEffects) {
+      // Apply the effect (which may modify the state and provide damage reduction)
+      nextState = effect.apply(nextState);
+      // Decrement remaining triggers if applicable
+      if (effect.remainingTriggers !== undefined) {
+        const remaining = effect.remainingTriggers - 1;
+        if (remaining <= 0) {
+          nextState = {
+            ...nextState,
+            activeEffects: nextState.activeEffects.filter(e => e.id !== effect.id),
+          };
+        } else {
+          nextState = {
+            ...nextState,
+            activeEffects: nextState.activeEffects.map(e =>
+              e.id === effect.id ? { ...e, remainingTriggers: remaining } : e
+            ),
+          };
+        }
+      }
+    }
+
+    // Apply damage with poise reduction
+    const damage = Math.max(0, finalDamage - nextState.player.poise);
+    const previousFace = nextState.player.face;
     nextState.player = {
       ...nextState.player,
-      poise: Math.max(0, nextState.player.poise - baseDamage),
+      poise: Math.max(0, nextState.player.poise - finalDamage),
       face: nextState.player.face - damage,
     };
-  } else if (intention.type === 'favor') {
-    const favorSteal = intention.value;
+    statChanges.playerFace = nextState.player.face - previousFace;
+  } else if (modifiedIntention.type === 'favor') {
+    const favorSteal = modifiedIntention.value;
+    const previousFavor = nextState.player.favor;
     nextState.player = {
       ...nextState.player,
       favor: Math.max(0, nextState.player.favor - favorSteal),
@@ -206,22 +399,49 @@ const executeOpponentAction = (state: GameState, intention: Intention): GameStat
       ...nextState.opponent,
       favor: Math.min(100, nextState.opponent.favor + favorSteal),
     };
-  } else if (intention.type === 'stall') {
-    nextState.patience -= intention.value;
-  } else if (intention.type === 'flustered') {
+    statChanges.playerFavor = nextState.player.favor - previousFavor;
+  } else if (modifiedIntention.type === 'stall') {
+    nextState.patience -= modifiedIntention.value;
+  } else if (modifiedIntention.type === 'flustered') {
     // Flustered does nothing - opponent wastes their action
-    combatLogger.logSystemEvent('Opponent Flustered', { effect: intention.name });
+    combatLogger.logSystemEvent('Opponent Flustered', { effect: modifiedIntention.name });
   }
 
+  // Emit opponent action event
+  nextState = emitGameEvent(nextState, {
+    type: 'opponent_action',
+    name: modifiedIntention.name,
+    description: getIntentionDescription(modifiedIntention),
+    actionType: modifiedIntention.type as 'attack' | 'favor' | 'stall',
+    value: modifiedIntention.value,
+    statChanges,
+  });
+
   combatLogger.logAIAction(
-    intention.name,
-    intention.type,
-    intention.value,
+    modifiedIntention.name,
+    modifiedIntention.type,
+    modifiedIntention.value,
     beforeState,
     nextState
   );
 
   return nextState;
+};
+
+// Helper to get intention description
+const getIntentionDescription = (intention: Intention): string => {
+  switch (intention.type) {
+    case 'attack':
+      return `Deals ${intention.value} damage`;
+    case 'favor':
+      return `Steals ${intention.value} favor`;
+    case 'stall':
+      return `Drains ${intention.value} patience`;
+    case 'flustered':
+      return 'Opponent is flustered!';
+    default:
+      return '';
+  }
 };
 
 // Pick a random intention from the pool

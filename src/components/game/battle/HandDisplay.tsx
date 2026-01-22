@@ -8,12 +8,14 @@ interface HandDisplayProps {
   cards: Card[];
   patience: number;
   playerFace: number;
+  playerPoise?: number;
   onPlayCard: (card: Card) => void;
+  disabled?: boolean;
 }
 
 const CARD_WIDTH = 128; // w-32 = 8rem = 128px
 
-export default function HandDisplay({ cards, patience, playerFace, onPlayCard }: HandDisplayProps) {
+export default function HandDisplay({ cards, patience, playerFace, playerPoise = 0, onPlayCard, disabled = false }: HandDisplayProps) {
   const [isHandHovered, setIsHandHovered] = useState(false);
   const [hoveredCardIndex, setHoveredCardIndex] = useState<number | null>(null);
 
@@ -56,7 +58,9 @@ export default function HandDisplay({ cards, patience, playerFace, onPlayCard }:
         >
           <AnimatePresence mode="popLayout">
             {cards.map((card, index) => {
-              const canAfford = patience >= card.patienceCost && playerFace >= card.faceCost;
+              // Face cost can be paid with poise first, then face
+              const effectiveFacePool = playerPoise + playerFace;
+              const canAfford = !disabled && patience >= card.patienceCost && effectiveFacePool >= card.faceCost;
               return (
                 <CardInHand
                   key={card.id}
@@ -65,8 +69,8 @@ export default function HandDisplay({ cards, patience, playerFace, onPlayCard }:
                   position={positions[index]}
                   index={index}
                   isHovered={hoveredCardIndex === index}
-                  onPlay={onPlayCard}
-                  onHover={setHoveredCardIndex}
+                  onPlay={disabled ? () => {} : onPlayCard}
+                  onHover={disabled ? () => {} : setHoveredCardIndex}
                 />
               );
             })}

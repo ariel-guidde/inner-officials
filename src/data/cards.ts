@@ -1,11 +1,8 @@
 import { Card, GameState } from '../types/game';
+import { addActiveEffect, createFavorGainEffect, createDamageReductionEffect, createHealingEffect, createPoiseGainEffect } from '../lib/effects';
+import { addBoardEffect, addIntentionModifier, revealNextIntention } from '../lib/engine';
 
 // Helper functions for card effects
-const adjustFace = (s: GameState, val: number) => ({
-  ...s,
-  player: { ...s.player, face: Math.min(s.player.maxFace, Math.max(0, s.player.face + val)) }
-});
-
 const adjustOpponentFace = (s: GameState, val: number) => ({
   ...s,
   opponent: { ...s.opponent, face: Math.max(0, s.opponent.face + val) }
@@ -21,11 +18,6 @@ const adjustPoise = (s: GameState, val: number) => ({
   player: { ...s.player, poise: s.player.poise + val }
 });
 
-const revealNextIntention = (s: GameState) => ({
-  ...s,
-  player: { ...s.player, canSeeNextIntention: true }
-});
-
 // Shuffle discard back into deck
 const shuffleDiscardIntoDeck = (s: GameState) => ({
   ...s,
@@ -33,6 +25,16 @@ const shuffleDiscardIntoDeck = (s: GameState) => ({
     ...s.player,
     deck: [...s.player.deck, ...s.player.discard].sort(() => Math.random() - 0.5),
     discard: [],
+  }
+});
+
+// Helper to remove a card from hand by id
+const removeCardFromHand = (s: GameState, cardId: string): GameState => ({
+  ...s,
+  player: {
+    ...s.player,
+    hand: s.player.hand.filter(c => c.id !== cardId),
+    discard: [...s.player.discard, ...s.player.hand.filter(c => c.id === cardId)],
   }
 });
 
@@ -64,50 +66,128 @@ export const DEBATE_DECK: Card[] = [
     description: 'Gain 8 Favor.',
     effect: (s) => adjustFavor(s, 8) },
 
-  // ==================== WOOD (Long-term / Gradual Effects) ====================
-  // Wood grows slowly but surely - favor generation and steady progress
+  // ==================== WOOD (Timed Effects) ====================
+  // Wood grows slowly - effects that build over time
   { id: 'w1', name: 'Seeds of Doubt', element: 'wood', patienceCost: 1, faceCost: 0,
     description: 'Gain 6 Favor.',
     effect: (s) => adjustFavor(s, 6) },
-  { id: 'w2', name: 'Bamboo Patience', element: 'wood', patienceCost: 2, faceCost: 0,
-    description: 'Gain 12 Favor.',
-    effect: (s) => adjustFavor(s, 12) },
+  { id: 'w2', name: 'Growing Roots', element: 'wood', patienceCost: 2, faceCost: 0,
+    description: 'Gain 5 Favor at end of turn for 3 turns.',
+    effect: (s) => addActiveEffect(s, {
+      name: 'Growing Roots',
+      description: 'Gain 5 Favor at end of turn',
+      element: 'wood',
+      trigger: 'turn_end',
+      remainingTurns: 3,
+      apply: createFavorGainEffect(5),
+      isPositive: true,
+    }) },
   { id: 'w3', name: 'Rooted Argument', element: 'wood', patienceCost: 2, faceCost: 0,
     description: 'Gain 10 Favor and 10 Composure.',
     effect: (s) => adjustPoise(adjustFavor(s, 10), 10) },
-  { id: 'w4', name: 'Spring Blossom', element: 'wood', patienceCost: 3, faceCost: 0,
-    description: 'Gain 18 Favor.',
-    effect: (s) => adjustFavor(s, 18) },
+  { id: 'w4', name: 'Thick Bark', element: 'wood', patienceCost: 3, faceCost: 0,
+    description: 'Next 3 attacks deal 5 less damage.',
+    effect: (s) => addActiveEffect(s, {
+      name: 'Thick Bark',
+      description: 'Next 3 attacks deal 5 less damage',
+      element: 'wood',
+      trigger: 'on_damage',
+      remainingTurns: -1,
+      remainingTriggers: 3,
+      apply: createDamageReductionEffect(5),
+      isPositive: true,
+    }) },
   { id: 'w5', name: 'Ancient Oak', element: 'wood', patienceCost: 4, faceCost: 0,
-    description: 'Gain 25 Favor.',
-    effect: (s) => adjustFavor(s, 25) },
-  { id: 'w6', name: 'Willow Grace', element: 'wood', patienceCost: 2, faceCost: 0,
-    description: 'Heal 3 Face, gain 8 Favor.',
-    effect: (s) => adjustFavor(adjustFace(s, 3), 8) },
-  { id: 'w7', name: 'Forest Canopy', element: 'wood', patienceCost: 3, faceCost: 0,
-    description: 'Gain 15 Favor and 15 Composure.',
-    effect: (s) => adjustPoise(adjustFavor(s, 15), 15) },
+    description: 'Gain 8 Favor at end of turn for 4 turns.',
+    effect: (s) => addActiveEffect(s, {
+      name: 'Ancient Oak',
+      description: 'Gain 8 Favor at end of turn',
+      element: 'wood',
+      trigger: 'turn_end',
+      remainingTurns: 4,
+      apply: createFavorGainEffect(8),
+      isPositive: true,
+    }) },
+  { id: 'w6', name: 'Regeneration', element: 'wood', patienceCost: 2, faceCost: 0,
+    description: 'Heal 3 Face at start of turn for 4 turns.',
+    effect: (s) => addActiveEffect(s, {
+      name: 'Regeneration',
+      description: 'Heal 3 Face at start of turn',
+      element: 'wood',
+      trigger: 'turn_start',
+      remainingTurns: 4,
+      apply: createHealingEffect(3),
+      isPositive: true,
+    }) },
+  { id: 'w7', name: 'Inner Peace', element: 'wood', patienceCost: 3, faceCost: 0,
+    description: 'Gain 10 Composure at start of turn for 3 turns.',
+    effect: (s) => addActiveEffect(s, {
+      name: 'Inner Peace',
+      description: 'Gain 10 Composure at start of turn',
+      element: 'wood',
+      trigger: 'turn_start',
+      remainingTurns: 3,
+      apply: createPoiseGainEffect(10),
+      isPositive: true,
+    }) },
   { id: 'w8', name: 'Evergreen', element: 'wood', patienceCost: 5, faceCost: 0,
     description: 'Gain 35 Favor.',
     effect: (s) => adjustFavor(s, 35) },
 
-  // ==================== FIRE (High Cost, High Reward, Remove from Play) ====================
-  // Fire burns bright but consumes - powerful effects that cost face
+  // ==================== FIRE (High Cost, Card Burning, Remove from Play) ====================
+  // Fire burns bright but consumes - powerful effects that cost face and can discard cards
   { id: 'f1', name: 'Blazing Wit', element: 'fire', patienceCost: 1, faceCost: 12,
     description: 'Gain 25 Favor. Removed after use.',
     effect: (s) => adjustFavor(s, 25), removeAfterPlay: true },
-  { id: 'f2', name: 'Searing Insult', element: 'fire', patienceCost: 1, faceCost: 15,
-    description: 'Deal 30 Shame.',
-    effect: (s) => adjustOpponentFace(s, -30) },
+  { id: 'f2', name: 'Purifying Flames', element: 'fire', patienceCost: 1, faceCost: 5,
+    description: 'Discard a card. Gain Favor equal to its patience cost x5.',
+    effect: (s) => s, // Base effect does nothing, targeted effect handles it
+    targetRequirement: {
+      type: 'hand_card',
+      filter: (c, _state) => c.id !== 'f2', // Can't target self
+      prompt: 'Choose a card to burn for Favor',
+    },
+    targetedEffect: (s, targets) => {
+      if (!targets.selectedCards || targets.selectedCards.length === 0) return s;
+      const targetCard = targets.selectedCards[0];
+      const favorGain = targetCard.patienceCost * 5;
+      let nextState = removeCardFromHand(s, targetCard.id);
+      return adjustFavor(nextState, favorGain);
+    },
+  },
   { id: 'f3', name: 'Dragons Heart', element: 'fire', patienceCost: 2, faceCost: 20,
     description: 'Gain 45 Favor. Removed after use.',
     effect: (s) => adjustFavor(s, 45), removeAfterPlay: true },
   { id: 'f4', name: 'Volcanic Fury', element: 'fire', patienceCost: 2, faceCost: 18,
     description: 'Deal 40 Shame.',
     effect: (s) => adjustOpponentFace(s, -40) },
-  { id: 'f5', name: 'Scorched Earth', element: 'fire', patienceCost: 1, faceCost: 10,
-    description: 'Deal 20 Shame.',
-    effect: (s) => adjustOpponentFace(s, -20) },
+  { id: 'f5', name: 'Cleansing Fire', element: 'fire', patienceCost: 2, faceCost: 8,
+    description: 'Remove a Bad card from hand. Gain 20 Favor.',
+    effect: (s) => s,
+    targetRequirement: {
+      type: 'hand_card',
+      filter: (c) => c.isBad === true,
+      optional: true,
+      prompt: 'Choose a Bad card to cleanse',
+    },
+    targetedEffect: (s, targets) => {
+      let nextState = s;
+      if (targets.selectedCards && targets.selectedCards.length > 0) {
+        const targetCard = targets.selectedCards[0];
+        // Remove bad card from game entirely
+        nextState = {
+          ...nextState,
+          player: {
+            ...nextState.player,
+            hand: nextState.player.hand.filter(c => c.id !== targetCard.id),
+            removedFromGame: [...nextState.player.removedFromGame, targetCard],
+          },
+        };
+        nextState = adjustFavor(nextState, 20);
+      }
+      return nextState;
+    },
+  },
   { id: 'f6', name: 'Phoenix Ascent', element: 'fire', patienceCost: 3, faceCost: 25,
     description: 'Gain 60 Favor. Removed after use.',
     effect: (s) => adjustFavor(s, 60), removeAfterPlay: true },
@@ -118,20 +198,33 @@ export const DEBATE_DECK: Card[] = [
     description: 'Deal 50 Shame. Removed after use.',
     effect: (s) => adjustOpponentFace(s, -50), removeAfterPlay: true },
 
-  // ==================== METAL (Reveal, Precision, Low Cost) ====================
-  // Metal is sharp and precise - small efficient effects and information
+  // ==================== METAL (Reveal, Board Effects, Intention Modifiers) ====================
+  // Metal is sharp and precise - defensive effects and information control
   { id: 'm1', name: 'Mirror Polish', element: 'metal', patienceCost: 1, faceCost: 0,
     description: 'Reveal opponents next intention.',
-    effect: revealNextIntention },
+    effect: (s) => revealNextIntention(s) },
   { id: 'm2', name: 'Silver Tongue', element: 'metal', patienceCost: 1, faceCost: 3,
     description: 'Gain 8 Favor, reveal next intention.',
     effect: (s) => revealNextIntention(adjustFavor(s, 8)) },
-  { id: 'm3', name: 'Surgical Strike', element: 'metal', patienceCost: 1, faceCost: 5,
-    description: 'Deal 12 Shame.',
-    effect: (s) => adjustOpponentFace(s, -12) },
-  { id: 'm4', name: 'Cold Logic', element: 'metal', patienceCost: 2, faceCost: 6,
-    description: 'Deal 15 Shame, reveal next intention.',
-    effect: (s) => revealNextIntention(adjustOpponentFace(s, -15)) },
+  { id: 'm3', name: 'Iron Curtain', element: 'metal', patienceCost: 3, faceCost: 5,
+    description: 'Next opponent attack deals no damage.',
+    effect: (s) => addBoardEffect(s, {
+      name: 'Iron Curtain',
+      effectType: 'negate_next_attack',
+    }) },
+  { id: 'm4', name: 'Deflecting Blade', element: 'metal', patienceCost: 2, faceCost: 5,
+    description: 'Next attack deals half damage. Reveal next intention.',
+    effect: (s) => {
+      let nextState = addIntentionModifier(s, {
+        name: 'Deflecting Blade',
+        remainingTriggers: 1,
+        modify: (intention) => ({
+          ...intention,
+          value: intention.type === 'attack' ? Math.floor(intention.value / 2) : intention.value,
+        }),
+      });
+      return revealNextIntention(nextState);
+    } },
   { id: 'm5', name: 'Gilded Edge', element: 'metal', patienceCost: 1, faceCost: 4,
     description: 'Gain 10 Favor.',
     effect: (s) => adjustFavor(s, 10) },

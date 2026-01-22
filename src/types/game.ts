@@ -9,6 +9,69 @@ export interface Intention {
 
 export type DrawCardsFunction = (state: GameState, count: number) => GameState;
 
+// ==================== TARGETING SYSTEM ====================
+export type TargetType = 'none' | 'hand_card';
+
+export interface TargetRequirement {
+  type: TargetType;
+  filter?: (card: Card, state: GameState) => boolean;
+  optional?: boolean;
+  prompt?: string;
+}
+
+export interface TargetedEffectContext {
+  selectedCards?: Card[];
+}
+
+// ==================== TIMED EFFECTS SYSTEM ====================
+export type EffectTrigger = 'turn_start' | 'turn_end' | 'on_damage' | 'passive';
+
+export interface ActiveEffect {
+  id: string;
+  name: string;
+  description: string;
+  element: Element;
+  trigger: EffectTrigger;
+  remainingTurns: number;        // -1 = permanent until triggers exhausted
+  remainingTriggers?: number;    // for "next N attacks" style
+  apply: (state: GameState) => GameState;
+  isPositive: boolean;
+}
+
+// ==================== BOARD EFFECTS SYSTEM ====================
+export type BoardEffectType = 'element_cost_mod' | 'negate_next_attack' | 'reflect_attack' | 'rule_mod';
+
+export interface BoardEffect {
+  id: string;
+  name: string;
+  effectType: BoardEffectType;
+  element?: Element;
+  value?: number;
+  turnsRemaining?: number;  // undefined = until triggered
+  isHidden?: boolean;
+}
+
+export interface IntentionModifier {
+  id: string;
+  name: string;
+  remainingTriggers: number;
+  modify: (intention: Intention) => Intention;
+}
+
+// ==================== EVENT SYSTEM ====================
+export type GameEventType = 'judge_decree' | 'opponent_action';
+
+export interface GameEvent {
+  id: string;
+  type: GameEventType;
+  name: string;
+  description: string;
+  actionType?: 'attack' | 'favor' | 'stall';
+  value?: number;
+  statChanges?: { playerFace?: number; playerFavor?: number; };
+}
+
+// ==================== CARD INTERFACE ====================
 export interface Card {
   id: string;
   name: string;
@@ -19,6 +82,9 @@ export interface Card {
   effect: (state: GameState, drawCards?: DrawCardsFunction) => GameState;
   isBad?: boolean; // Bad cards are removed from game when played
   removeAfterPlay?: boolean; // Fire cards that burn out after use
+  // Targeting system
+  targetedEffect?: (state: GameState, targets: TargetedEffectContext, drawCards?: DrawCardsFunction) => GameState;
+  targetRequirement?: TargetRequirement;
 }
 
 export type Screen = 'menu' | 'deck' | 'how-to-play' | 'settings' | 'battle' | 'battle-summary';
@@ -33,7 +99,7 @@ export interface SessionState {
   sessionWon: boolean | null;
 }
 
-export type TurnPhase = 'player_action' | 'resolving' | 'opponent_turn' | 'drawing';
+export type TurnPhase = 'player_action' | 'targeting' | 'resolving' | 'opponent_turn' | 'drawing';
 
 export interface CombatLogEntry {
   id: string;
@@ -64,6 +130,7 @@ export interface JudgeEffects {
   elementCostModifier: Partial<Record<Element, number>>; // +/- patience cost per element
   favorGainModifier: number;         // Multiplier for favor gains (1.0 = normal)
   damageModifier: number;            // Multiplier for damage dealt (1.0 = normal)
+  activeDecrees: Array<{ name: string; description: string; turnApplied: number }>;
 }
 
 export interface GameState {
@@ -100,4 +167,17 @@ export interface GameState {
   winner: 'player' | 'opponent' | null;
   turnNumber?: number;
   turnPhase?: TurnPhase;
+  // Targeting system
+  pendingCard?: Card;
+  targetingContext?: {
+    requirement: TargetRequirement;
+    selectedTargets: Card[];
+  };
+  // Active effects system (wood cards)
+  activeEffects: ActiveEffect[];
+  // Board effects system (metal cards)
+  boardEffects: BoardEffect[];
+  intentionModifiers: IntentionModifier[];
+  // Event system
+  pendingEvents: GameEvent[];
 }

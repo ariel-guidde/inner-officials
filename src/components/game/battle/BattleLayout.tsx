@@ -20,6 +20,8 @@ interface BattleLayoutProps {
   campaignProgress?: React.ReactNode;
   // Debug panel
   debugPanel?: React.ReactNode;
+  // Active effects display
+  activeEffectsDisplay?: React.ReactNode;
 }
 
 export default function BattleLayout({
@@ -33,6 +35,7 @@ export default function BattleLayout({
   actionBar,
   campaignProgress,
   debugPanel,
+  activeEffectsDisplay,
 }: BattleLayoutProps) {
   return (
     <div className="relative min-h-screen bg-stone-950 text-stone-100 font-serif overflow-hidden">
@@ -74,6 +77,13 @@ export default function BattleLayout({
         <div className="fixed bottom-4 left-4 z-20">
           {playerPanel}
         </div>
+
+        {/* Active Effects Display (below player panel) */}
+        {activeEffectsDisplay && (
+          <div className="fixed bottom-40 left-4 z-20 w-64">
+            {activeEffectsDisplay}
+          </div>
+        )}
 
         {/* Bottom: Deck/Discard display (above hand area) */}
         <div className="fixed bottom-52 left-1/2 -translate-x-1/2 z-20">
