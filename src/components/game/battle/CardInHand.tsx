@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Card, Element, GameState } from '../../../types/game';
+import { Card, Element, GameState, ELEMENT } from '../../../types/game';
 import ElementIcon from '../ElementIcon';
 import CardTooltip from './CardTooltip';
 import { calculateEffectiveCosts } from '../../../lib/cardCosts';
@@ -23,19 +23,19 @@ interface CardInHandProps {
 }
 
 const ELEMENT_BORDERS: Record<Element, string> = {
-  wood: 'border-green-600',
-  fire: 'border-red-600',
-  earth: 'border-yellow-600',
-  metal: 'border-slate-400',
-  water: 'border-blue-600',
+  [ELEMENT.WOOD]: 'border-green-600',
+  [ELEMENT.FIRE]: 'border-red-600',
+  [ELEMENT.EARTH]: 'border-yellow-600',
+  [ELEMENT.METAL]: 'border-slate-400',
+  [ELEMENT.WATER]: 'border-blue-600',
 };
 
 const ELEMENT_BG: Record<Element, string> = {
-  wood: 'bg-gradient-to-b from-green-950 to-stone-900',
-  fire: 'bg-gradient-to-b from-red-950 to-stone-900',
-  earth: 'bg-gradient-to-b from-yellow-950 to-stone-900',
-  metal: 'bg-gradient-to-b from-slate-900 to-stone-900',
-  water: 'bg-gradient-to-b from-blue-950 to-stone-900',
+  [ELEMENT.WOOD]: 'bg-gradient-to-b from-green-950 to-stone-900',
+  [ELEMENT.FIRE]: 'bg-gradient-to-b from-red-950 to-stone-900',
+  [ELEMENT.EARTH]: 'bg-gradient-to-b from-yellow-950 to-stone-900',
+  [ELEMENT.METAL]: 'bg-gradient-to-b from-slate-900 to-stone-900',
+  [ELEMENT.WATER]: 'bg-gradient-to-b from-blue-950 to-stone-900',
 };
 
 // Bad card indicator overlay (doesn't override element colors)

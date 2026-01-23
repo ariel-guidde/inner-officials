@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ActiveEffect, BoardEffect, Element } from '../../../types/game';
+import { ActiveEffect, BoardEffect, Element, ELEMENT, EFFECT_TRIGGER, BOARD_EFFECT_TYPE } from '../../../types/game';
 import { Clock, Shield, Zap, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import ElementIcon from '../ElementIcon';
 
@@ -10,22 +10,22 @@ interface ActiveEffectsDisplayProps {
 }
 
 const ELEMENT_COLORS: Record<Element, string> = {
-  wood: 'border-green-600/50 bg-green-900/30',
-  fire: 'border-red-600/50 bg-red-900/30',
-  earth: 'border-yellow-600/50 bg-yellow-900/30',
-  metal: 'border-slate-400/50 bg-slate-900/30',
-  water: 'border-blue-600/50 bg-blue-900/30',
+  [ELEMENT.WOOD]: 'border-green-600/50 bg-green-900/30',
+  [ELEMENT.FIRE]: 'border-red-600/50 bg-red-900/30',
+  [ELEMENT.EARTH]: 'border-yellow-600/50 bg-yellow-900/30',
+  [ELEMENT.METAL]: 'border-slate-400/50 bg-slate-900/30',
+  [ELEMENT.WATER]: 'border-blue-600/50 bg-blue-900/30',
 };
 
 const getTriggerIcon = (trigger: string) => {
   switch (trigger) {
-    case 'turn_start':
+    case EFFECT_TRIGGER.TURN_START:
       return <Sparkles className="w-3 h-3" />;
-    case 'turn_end':
+    case EFFECT_TRIGGER.TURN_END:
       return <Clock className="w-3 h-3" />;
-    case 'on_damage':
+    case EFFECT_TRIGGER.ON_DAMAGE:
       return <Shield className="w-3 h-3" />;
-    case 'passive':
+    case EFFECT_TRIGGER.PASSIVE:
       return <Zap className="w-3 h-3" />;
     default:
       return null;
@@ -100,7 +100,7 @@ export default function ActiveEffectsDisplay({ activeEffects, boardEffects }: Ac
               {/* Board Effects (from metal cards) */}
               {boardEffects.map((effect, index) => {
                 // For trap effects like negate_next_attack, show as "1 use" since they trigger once
-                const isTrapEffect = effect.effectType === 'negate_next_attack' || effect.effectType === 'reflect_attack';
+                const isTrapEffect = effect.effectType === BOARD_EFFECT_TYPE.NEGATE_NEXT_ATTACK || effect.effectType === BOARD_EFFECT_TYPE.REFLECT_ATTACK;
                 const displayCount = isTrapEffect ? 1 : effect.turnsRemaining;
                 const countLabel = isTrapEffect ? 'use' : 'turns';
                 
@@ -111,7 +111,7 @@ export default function ActiveEffectsDisplay({ activeEffects, boardEffects }: Ac
                   >
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2">
-                        <ElementIcon element="metal" size="xs" />
+                        <ElementIcon element={ELEMENT.METAL} size="xs" />
                         <span className="text-sm font-medium text-stone-100">
                           {effect.name}
                         </span>
@@ -151,7 +151,7 @@ export default function ActiveEffectsDisplay({ activeEffects, boardEffects }: Ac
           {boardEffects.slice(0, 3).map((effect) => (
             <div
               key={effect.id}
-              className={`px-2 py-0.5 rounded-full text-xs border ${ELEMENT_COLORS.metal}`}
+              className={`px-2 py-0.5 rounded-full text-xs border ${ELEMENT_COLORS[ELEMENT.METAL]}`}
             >
               <span className="text-stone-300">{effect.name}</span>
             </div>
@@ -167,13 +167,13 @@ export default function ActiveEffectsDisplay({ activeEffects, boardEffects }: Ac
 
 function getEffectDescription(effect: BoardEffect): string {
   switch (effect.effectType) {
-    case 'negate_next_attack':
+    case BOARD_EFFECT_TYPE.NEGATE_NEXT_ATTACK:
       return 'Negates the next opponent attack';
-    case 'reflect_attack':
+    case BOARD_EFFECT_TYPE.REFLECT_ATTACK:
       return `Reflects ${effect.value || 50}% of next attack damage`;
-    case 'element_cost_mod':
+    case BOARD_EFFECT_TYPE.ELEMENT_COST_MOD:
       return `${effect.element} cards cost ${effect.value! > 0 ? '+' : ''}${effect.value} patience`;
-    case 'rule_mod':
+    case BOARD_EFFECT_TYPE.RULE_MOD:
       return 'Modifies game rules';
     default:
       return '';

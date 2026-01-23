@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { GameState, TurnPhase } from '../types/game';
+import { GameState, TurnPhase, TURN_PHASE } from '../types/game';
 
 export interface TurnFlowManager {
   setPhase: (state: GameState, phase: TurnPhase) => GameState;
@@ -24,7 +24,7 @@ export function useTurnFlow(): TurnFlowManager {
   }, []);
 
   const getCurrentPhase = useCallback((state: GameState): TurnPhase => {
-    return state.turnPhase ?? 'player_action';
+    return state.turnPhase ?? TURN_PHASE.PLAYER_ACTION;
   }, []);
 
   const getCurrentTurn = useCallback((state: GameState): number => {

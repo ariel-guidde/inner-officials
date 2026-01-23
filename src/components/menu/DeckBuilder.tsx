@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Minus, X } from 'lucide-react';
-import { Card, SavedDeck, Element } from '../../types/game';
+import { Card, SavedDeck, Element, ELEMENT } from '../../types/game';
 import { DEBATE_DECK } from '../../data/cards';
 import { getCardById } from '../../lib/saveService';
 import ElementIcon from '../game/ElementIcon';
@@ -18,13 +18,13 @@ const MAX_COPIES_PER_CARD = 3;
 const MIN_DECK_SIZE = 15;
 const MAX_DECK_SIZE = 25;
 
-const elementOrder: Array<Element> = ['wood', 'fire', 'earth', 'metal', 'water'];
-const elementNames: Record<string, string> = {
-  wood: 'Wood',
-  fire: 'Fire',
-  earth: 'Earth',
-  metal: 'Metal',
-  water: 'Water',
+const elementOrder: Array<Element> = [ELEMENT.WOOD, ELEMENT.FIRE, ELEMENT.EARTH, ELEMENT.METAL, ELEMENT.WATER];
+const elementNames: Record<Element, string> = {
+  [ELEMENT.WOOD]: 'Wood',
+  [ELEMENT.FIRE]: 'Fire',
+  [ELEMENT.EARTH]: 'Earth',
+  [ELEMENT.METAL]: 'Metal',
+  [ELEMENT.WATER]: 'Water',
 };
 
 export default function DeckBuilder({ deck, onSave, onCancel, validateDeck }: DeckBuilderProps) {

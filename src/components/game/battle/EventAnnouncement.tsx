@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { GameEvent } from '../../../types/game';
+import { GameEvent, GAME_EVENT_TYPE, INTENTION_TYPE } from '../../../types/game';
 import { Gavel, Swords, Heart, Hourglass, Sparkles } from 'lucide-react';
 
 interface EventAnnouncementProps {
@@ -9,7 +9,7 @@ interface EventAnnouncementProps {
 export default function EventAnnouncement({ event }: EventAnnouncementProps) {
   if (!event) return null;
 
-  const isJudge = event.type === 'judge_decree';
+  const isJudge = event.type === GAME_EVENT_TYPE.JUDGE_DECREE;
   const bgColor = isJudge
     ? 'from-amber-900/95 to-amber-950/95'
     : 'from-red-900/95 to-red-950/95';
@@ -21,11 +21,11 @@ export default function EventAnnouncement({ event }: EventAnnouncementProps) {
       return <Gavel className="w-8 h-8 text-amber-400" />;
     }
     switch (event.actionType) {
-      case 'attack':
+      case INTENTION_TYPE.ATTACK:
         return <Swords className="w-8 h-8 text-red-400" />;
-      case 'favor':
+      case INTENTION_TYPE.FAVOR:
         return <Sparkles className="w-8 h-8 text-purple-400" />;
-      case 'stall':
+      case INTENTION_TYPE.STALL:
         return <Hourglass className="w-8 h-8 text-orange-400" />;
       default:
         return <Swords className="w-8 h-8 text-red-400" />;

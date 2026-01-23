@@ -1,18 +1,18 @@
-import { Card, GameState, Element } from '../types/game';
+import { Card, GameState, Element, ELEMENT } from '../types/game';
 import { DEFAULT_JUDGE_EFFECTS } from './engine';
 
 const HARMONY_THRESHOLD = 5;
 
 // Check if card follows harmony cycle
 const checkBalanced = (last: Element | null, current: Element): boolean => {
-  const cycle: Element[] = ['wood', 'fire', 'earth', 'metal', 'water'];
+  const cycle: Element[] = [ELEMENT.WOOD, ELEMENT.FIRE, ELEMENT.EARTH, ELEMENT.METAL, ELEMENT.WATER];
   if (!last) return false; // First move is NOT in harmony
   return cycle[(cycle.indexOf(last) + 1) % 5] === current;
 };
 
 // Check if card is chaos (skips one element)
 const checkChaos = (last: Element | null, current: Element): boolean => {
-  const cycle: Element[] = ['wood', 'fire', 'earth', 'metal', 'water'];
+  const cycle: Element[] = [ELEMENT.WOOD, ELEMENT.FIRE, ELEMENT.EARTH, ELEMENT.METAL, ELEMENT.WATER];
   if (!last) return false;
   return cycle[(cycle.indexOf(last) + 2) % 5] === current;
 };

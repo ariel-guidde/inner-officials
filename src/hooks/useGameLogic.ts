@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { GameState, Card, StateHistoryEntry, Intention, TargetedEffectContext } from '../types/game';
+import { GameState, Card, StateHistoryEntry, Intention, TargetedEffectContext, TURN_PHASE, COMBAT_LOG_ACTOR, CARD_DESTINATION } from '../types/game';
 import { DEBATE_DECK } from '../data/cards';
 import { OPPONENTS, JUDGE_ACTIONS } from '../data/opponents';
 import { processTurn, processEndTurn, processStartTurn, DEFAULT_JUDGE_EFFECTS } from '../lib/engine';
@@ -117,7 +117,7 @@ function createInitialState(config: BattleConfig = {}): GameState {
     isGameOver: false,
     winner: null,
     turnNumber: 1,
-    turnPhase: 'player_action',
+    turnPhase: TURN_PHASE.PLAYER_ACTION,
     // New systems
     activeEffects: [],
     boardEffects: [],
@@ -146,7 +146,7 @@ export function useGameLogic(config: BattleConfig = {}) {
         if (prevState.isGameOver) return prevState;
         if (prevState.patience < 0) return prevState;
 
-        let nextState = turnFlow.setPhase(prevState, 'resolving');
+        let nextState = turnFlow.setPhase(prevState, TURN_PHASE.RESOLVING);
 
         // Handle random selection if needed (before main effect)
         if (card.targetRequirement?.selectionMode === 'random' && !targetContext) {
@@ -162,9 +162,9 @@ export function useGameLogic(config: BattleConfig = {}) {
             const selectedCard = candidates[randomIndex];
             
             // Apply destination (burn or discard)
-            if (req.destination === 'burn') {
+            if (req.destination === CARD_DESTINATION.BURN) {
               nextState = deck.burnCard(nextState, selectedCard.id);
-            } else if (req.destination === 'discard') {
+            } else if (req.destination === CARD_DESTINATION.DISCARD) {
               nextState = deck.discardCard(nextState, selectedCard.id);
             }
             
@@ -178,11 +178,11 @@ export function useGameLogic(config: BattleConfig = {}) {
           const req = card.targetRequirement;
           
           // Apply destination for selected cards (burn or discard)
-          if (req.destination === 'burn') {
+          if (req.destination === CARD_DESTINATION.BURN) {
             targetContext.selectedCards.forEach(targetCard => {
               nextState = deck.burnCard(nextState, targetCard.id);
             });
-          } else if (req.destination === 'discard') {
+          } else if (req.destination === CARD_DESTINATION.DISCARD) {
             targetContext.selectedCards.forEach(targetCard => {
               nextState = deck.discardCard(nextState, targetCard.id);
             });
@@ -202,7 +202,7 @@ export function useGameLogic(config: BattleConfig = {}) {
         nextState = eventQueue.processEvents(nextState);
 
         // Return to player_action phase
-        nextState = turnFlow.setPhase(nextState, 'player_action');
+        nextState = turnFlow.setPhase(nextState, TURN_PHASE.PLAYER_ACTION);
 
         return nextState;
       }, `Play Card: ${card.name}`);
@@ -222,7 +222,7 @@ export function useGameLogic(config: BattleConfig = {}) {
         const needsTargeting = targeting.startTargeting(card, state);
         if (needsTargeting) {
           // Update state to targeting phase
-          updateState((prevState) => turnFlow.setPhase(prevState, 'targeting'), 'Enter Targeting');
+          updateState((prevState) => turnFlow.setPhase(prevState, TURN_PHASE.TARGETING), 'Enter Targeting');
           return;
         }
         // If optional targeting with no valid targets, proceed without targets
@@ -245,7 +245,7 @@ export function useGameLogic(config: BattleConfig = {}) {
   // Cancel targeting and return to player action
   const cancelTargeting = useCallback(() => {
     targeting.cancelTargeting();
-    updateState((prevState) => turnFlow.setPhase(prevState, 'player_action'), 'Cancel Targeting');
+    updateState((prevState) => turnFlow.setPhase(prevState, TURN_PHASE.PLAYER_ACTION), 'Cancel Targeting');
   }, [targeting, updateState, turnFlow]);
 
   const endTurn = useCallback(() => {
@@ -253,7 +253,7 @@ export function useGameLogic(config: BattleConfig = {}) {
       if (prevState.isGameOver) return prevState;
 
       // 1. Set phase to opponent turn
-      let nextState = turnFlow.setPhase(prevState, 'opponent_turn');
+      let nextState = turnFlow.setPhase(prevState, TURN_PHASE.OPPONENT_TURN);
 
       // 2. Move all cards from hand to discard
       nextState = deck.discardHand(nextState);
@@ -270,7 +270,7 @@ export function useGameLogic(config: BattleConfig = {}) {
       }
 
       // 6. Set phase to drawing
-      nextState = turnFlow.setPhase(nextState, 'drawing');
+      nextState = turnFlow.setPhase(nextState, TURN_PHASE.DRAWING);
 
       // 7. Draw new hand
       nextState = deck.drawCards(
@@ -296,7 +296,7 @@ export function useGameLogic(config: BattleConfig = {}) {
   const getBattleResult = useCallback(() => {
     if (!state.isGameOver) return null;
     return {
-      won: state.winner === 'player',
+      won: state.winner === COMBAT_LOG_ACTOR.PLAYER,
       finalFace: state.player.face,
       opponentName: state.opponent.name,
       favorGained: state.player.favor,

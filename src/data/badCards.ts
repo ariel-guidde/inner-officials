@@ -1,39 +1,31 @@
-import { Card, GameState, Element } from '../types/game';
+import { Card, GameState, ELEMENT } from '../types/game';
 
 // Bad cards that can be generated when drawing while face is low
 // These cards cost patience/face but have no benefit
 // They are removed from the game when played
 
-const ELEMENTS: Element[] = ['wood', 'fire', 'earth', 'metal', 'water'];
+const ELEMENTS = Object.values(ELEMENT);
 
 const BAD_CARD_TEMPLATES: Omit<Card, 'id' | 'element'>[] = [
   {
     name: 'Nervous Stammer',
-    patienceCost: 2,
-    faceCost: 0,
+    patienceCost: 1,
+    faceCost: 3,
     description: 'You falter. No effect.',
     effect: (s: GameState) => s,
     isBad: true,
   },
   {
     name: 'Sweaty Palms',
-    patienceCost: 1,
-    faceCost: 5,
+    patienceCost: 0,
+    faceCost: 3,
     description: 'Lose composure. No effect.',
     effect: (s: GameState) => s,
     isBad: true,
   },
   {
-    name: 'Blank Mind',
-    patienceCost: 3,
-    faceCost: 0,
-    description: 'Your mind goes blank. No effect.',
-    effect: (s: GameState) => s,
-    isBad: true,
-  },
-  {
     name: 'Trembling Voice',
-    patienceCost: 2,
+    patienceCost: 1,
     faceCost: 3,
     description: 'Your voice wavers. No effect.',
     effect: (s: GameState) => s,
@@ -41,36 +33,12 @@ const BAD_CARD_TEMPLATES: Omit<Card, 'id' | 'element'>[] = [
   },
   {
     name: 'Awkward Silence',
-    patienceCost: 1,
+    patienceCost: 4,
     faceCost: 0,
     description: 'An uncomfortable pause. No effect.',
     effect: (s: GameState) => s,
     isBad: true,
-  },
-  {
-    name: 'Misspoken Word',
-    patienceCost: 2,
-    faceCost: 5,
-    description: 'You say the wrong thing. No effect.',
-    effect: (s: GameState) => s,
-    isBad: true,
-  },
-  {
-    name: 'Lost Train of Thought',
-    patienceCost: 2,
-    faceCost: 0,
-    description: 'Where was I? No effect.',
-    effect: (s: GameState) => s,
-    isBad: true,
-  },
-  {
-    name: 'Visible Panic',
-    patienceCost: 1,
-    faceCost: 8,
-    description: 'Your fear shows. No effect.',
-    effect: (s: GameState) => s,
-    isBad: true,
-  },
+  }
 ];
 
 let badCardCounter = 0;

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Swords, Sparkles, Hourglass, Zap, HelpCircle } from 'lucide-react';
-import { Intention, JudgeEffects } from '../../../types/game';
+import { Intention, JudgeEffects, INTENTION_TYPE, IntentionType } from '../../../types/game';
 
 interface OpponentInfoPanelProps {
   name: string;
@@ -23,25 +23,25 @@ const OPPONENT_SPRITES: Record<string, string> = {
   'The Empress': '👑',
 };
 
-const INTENTION_ICONS: Record<string, React.ReactNode> = {
-  attack: <Swords className="w-4 h-4 text-red-400" />,
-  favor: <Sparkles className="w-4 h-4 text-purple-400" />,
-  stall: <Hourglass className="w-4 h-4 text-amber-400" />,
-  flustered: <Zap className="w-4 h-4 text-blue-400" />,
+const INTENTION_ICONS: Record<IntentionType, React.ReactNode> = {
+  [INTENTION_TYPE.ATTACK]: <Swords className="w-4 h-4 text-red-400" />,
+  [INTENTION_TYPE.FAVOR]: <Sparkles className="w-4 h-4 text-purple-400" />,
+  [INTENTION_TYPE.STALL]: <Hourglass className="w-4 h-4 text-amber-400" />,
+  [INTENTION_TYPE.FLUSTERED]: <Zap className="w-4 h-4 text-blue-400" />,
 };
 
-const INTENTION_COLORS: Record<string, string> = {
-  attack: 'intention-attack',
-  favor: 'intention-favor',
-  stall: 'intention-stall',
-  flustered: 'intention-flustered',
+const INTENTION_COLORS: Record<IntentionType, string> = {
+  [INTENTION_TYPE.ATTACK]: 'intention-attack',
+  [INTENTION_TYPE.FAVOR]: 'intention-favor',
+  [INTENTION_TYPE.STALL]: 'intention-stall',
+  [INTENTION_TYPE.FLUSTERED]: 'intention-flustered',
 };
 
-const INTENTION_DESCRIPTIONS: Record<string, (value: number, remaining: number) => string> = {
-  attack: (value, remaining) => `Will deal ${value} damage to your Face (reduced by Composure) after ${remaining} more patience spent`,
-  favor: (value, remaining) => `Will steal ${value} Favor from you after ${remaining} more patience spent`,
-  stall: (value, remaining) => `Will reduce Patience by ${value} after ${remaining} more patience spent`,
-  flustered: () => `Opponent is flustered and will waste their action`,
+const INTENTION_DESCRIPTIONS: Record<IntentionType, (value: number, remaining: number) => string> = {
+  [INTENTION_TYPE.ATTACK]: (value, remaining) => `Will deal ${value} damage to your Face (reduced by Composure) after ${remaining} more patience spent`,
+  [INTENTION_TYPE.FAVOR]: (value, remaining) => `Will steal ${value} Favor from you after ${remaining} more patience spent`,
+  [INTENTION_TYPE.STALL]: (value, remaining) => `Will reduce Patience by ${value} after ${remaining} more patience spent`,
+  [INTENTION_TYPE.FLUSTERED]: () => `Opponent is flustered and will waste their action`,
 };
 
 export default function OpponentInfoPanel({
@@ -67,7 +67,7 @@ export default function OpponentInfoPanel({
   // Calculate displayed value with modifiers
   const getDisplayedValue = (intention: Intention | null): number => {
     if (!intention) return 0;
-    if (intention.type === 'attack') {
+    if (intention.type === INTENTION_TYPE.ATTACK) {
       return Math.floor(intention.value * judgeEffects.damageModifier);
     }
     return intention.value;
@@ -75,7 +75,7 @@ export default function OpponentInfoPanel({
 
   const getIntentionDescription = (intention: Intention | null, remaining?: number) => {
     if (!intention) return '';
-    if (intention.type === 'flustered') {
+    if (intention.type === INTENTION_TYPE.FLUSTERED) {
       return `Opponent is flustered and will waste their action (after ${remaining ?? intention.patienceThreshold} more patience spent)`;
     }
     const displayedValue = getDisplayedValue(intention);
@@ -143,10 +143,10 @@ export default function OpponentInfoPanel({
             onMouseEnter={() => setShowTooltip(true)}
             onMouseLeave={() => setShowTooltip(false)}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-help ${
-              INTENTION_COLORS[currentIntention?.type || 'attack']
+              INTENTION_COLORS[currentIntention?.type || INTENTION_TYPE.ATTACK]
             }`}
           >
-            {INTENTION_ICONS[currentIntention?.type || 'attack']}
+            {INTENTION_ICONS[currentIntention?.type || INTENTION_TYPE.ATTACK]}
             <div className="flex-1 min-w-0">
               <span className="text-sm">{currentIntention?.name}</span>
               {currentIntention && getDisplayedValue(currentIntention) > 0 && (

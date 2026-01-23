@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Card, Element, GameState } from '../../../types/game';
+import { Card, Element, GameState, ELEMENT } from '../../../types/game';
 import ElementIcon from '../ElementIcon';
 import { calculateEffectiveCosts, calculateChaosModifiers } from '../../../lib/cardCosts';
 
@@ -11,11 +11,11 @@ interface CardTooltipProps {
 }
 
 const ELEMENT_COLORS: Record<Element, string> = {
-  wood: 'border-green-500 bg-green-950/90',
-  fire: 'border-red-500 bg-red-950/90',
-  earth: 'border-yellow-500 bg-yellow-950/90',
-  metal: 'border-slate-400 bg-slate-950/90',
-  water: 'border-blue-500 bg-blue-950/90',
+  [ELEMENT.WOOD]: 'border-green-500 bg-green-950/90',
+  [ELEMENT.FIRE]: 'border-red-500 bg-red-950/90',
+  [ELEMENT.EARTH]: 'border-yellow-500 bg-yellow-950/90',
+  [ELEMENT.METAL]: 'border-slate-400 bg-slate-950/90',
+  [ELEMENT.WATER]: 'border-blue-500 bg-blue-950/90',
 };
 
 export default function CardTooltip({ card, canAfford, playabilityReason, gameState }: CardTooltipProps) {

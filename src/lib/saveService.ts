@@ -23,15 +23,15 @@ function createDefaultStarterDeck(): SavedDeck {
   // Create a balanced starter deck with ~20 cards distributed across elements
   const starterCardIds = [
     // Water cards (4)
-    'wa1', 'wa2', 'wa3', 'wa6',
+    'wa1', 'wa2', 'wa2', 'wa2',
     // Wood cards (4)
-    'w1', 'w2', 'w3', 'w6',
+    'w1', 'w2', 'w3', 'w3',
     // Fire cards (4)
-    'f1', 'f2', 'f7', 'f9',
+    'f1', 'f2', 'f3', 'f4',
     // Metal cards (4)
-    'm1', 'm2', 'm5', 'm6',
+    'm1', 'm2', 'm5', 'm6', 
     // Earth cards (4)
-    'e1', 'e2', 'e5', 'e6',
+    'e1', 'e2', 'e2', 'e2',
   ];
   
   return {

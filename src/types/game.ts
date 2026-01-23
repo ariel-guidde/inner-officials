@@ -1,8 +1,27 @@
-export type Element = 'wood' | 'fire' | 'earth' | 'metal' | 'water';
+// ==================== ELEMENT TYPE ====================
+export const ELEMENT = {
+  WOOD: 'wood',
+  FIRE: 'fire',
+  EARTH: 'earth',
+  METAL: 'metal',
+  WATER: 'water',
+} as const;
+
+export type Element = typeof ELEMENT[keyof typeof ELEMENT];
+
+// ==================== INTENTION TYPE ====================
+export const INTENTION_TYPE = {
+  ATTACK: 'attack',
+  FAVOR: 'favor',
+  STALL: 'stall',
+  FLUSTERED: 'flustered',
+} as const;
+
+export type IntentionType = typeof INTENTION_TYPE[keyof typeof INTENTION_TYPE];
 
 export interface Intention {
   name: string;
-  type: 'attack' | 'favor' | 'stall' | 'flustered';
+  type: IntentionType;
   value: number;
   patienceThreshold: number; // Patience spent until this action executes
 }
@@ -10,13 +29,31 @@ export interface Intention {
 export type DrawCardsFunction = (state: GameState, count: number) => GameState;
 
 // ==================== TARGETING SYSTEM ====================
-export type TargetType = 'none' | 'hand_card';
-export type CardDestination = 'discard' | 'burn'; // discard = goes to discard pile, burn = removed from play
+export const TARGET_TYPE = {
+  NONE: 'none',
+  HAND_CARD: 'hand_card',
+} as const;
+
+export type TargetType = typeof TARGET_TYPE[keyof typeof TARGET_TYPE];
+
+export const CARD_DESTINATION = {
+  DISCARD: 'discard',
+  BURN: 'burn',
+} as const;
+
+export type CardDestination = typeof CARD_DESTINATION[keyof typeof CARD_DESTINATION]; // discard = goes to discard pile, burn = removed from play
+
+export const SELECTION_MODE = {
+  CHOOSE: 'choose',
+  RANDOM: 'random',
+} as const;
+
+export type SelectionMode = typeof SELECTION_MODE[keyof typeof SELECTION_MODE];
 
 export interface TargetRequirement {
   type: TargetType;
   destination?: CardDestination; // Where selected cards go
-  selectionMode?: 'choose' | 'random'; // User choice vs random
+  selectionMode?: SelectionMode; // User choice vs random
   count?: number; // How many cards (default 1)
   filter?: (card: Card, state: GameState) => boolean;
   optional?: boolean;
@@ -29,7 +66,14 @@ export interface TargetedEffectContext {
 }
 
 // ==================== TIMED EFFECTS SYSTEM ====================
-export type EffectTrigger = 'turn_start' | 'turn_end' | 'on_damage' | 'passive';
+export const EFFECT_TRIGGER = {
+  TURN_START: 'turn_start',
+  TURN_END: 'turn_end',
+  ON_DAMAGE: 'on_damage',
+  PASSIVE: 'passive',
+} as const;
+
+export type EffectTrigger = typeof EFFECT_TRIGGER[keyof typeof EFFECT_TRIGGER];
 
 export interface ActiveEffect {
   id: string;
@@ -44,7 +88,14 @@ export interface ActiveEffect {
 }
 
 // ==================== BOARD EFFECTS SYSTEM ====================
-export type BoardEffectType = 'element_cost_mod' | 'negate_next_attack' | 'reflect_attack' | 'rule_mod';
+export const BOARD_EFFECT_TYPE = {
+  ELEMENT_COST_MOD: 'element_cost_mod',
+  NEGATE_NEXT_ATTACK: 'negate_next_attack',
+  REFLECT_ATTACK: 'reflect_attack',
+  RULE_MOD: 'rule_mod',
+} as const;
+
+export type BoardEffectType = typeof BOARD_EFFECT_TYPE[keyof typeof BOARD_EFFECT_TYPE];
 
 export interface BoardEffect {
   id: string;
@@ -64,14 +115,19 @@ export interface IntentionModifier {
 }
 
 // ==================== EVENT SYSTEM ====================
-export type GameEventType = 'judge_decree' | 'opponent_action';
+export const GAME_EVENT_TYPE = {
+  JUDGE_DECREE: 'judge_decree',
+  OPPONENT_ACTION: 'opponent_action',
+} as const;
+
+export type GameEventType = typeof GAME_EVENT_TYPE[keyof typeof GAME_EVENT_TYPE];
 
 export interface GameEvent {
   id: string;
   type: GameEventType;
   name: string;
   description: string;
-  actionType?: 'attack' | 'favor' | 'stall';
+  actionType?: IntentionType;
   value?: number;
   statChanges?: { playerFace?: number; playerFavor?: number; };
 }
@@ -92,7 +148,17 @@ export interface Card {
   targetRequirement?: TargetRequirement;
 }
 
-export type Screen = 'menu' | 'deck' | 'how-to-play' | 'settings' | 'battle' | 'battle-summary';
+// ==================== SCREEN TYPE ====================
+export const SCREEN = {
+  MENU: 'menu',
+  DECK: 'deck',
+  HOW_TO_PLAY: 'how-to-play',
+  SETTINGS: 'settings',
+  BATTLE: 'battle',
+  BATTLE_SUMMARY: 'battle-summary',
+} as const;
+
+export type Screen = typeof SCREEN[keyof typeof SCREEN];
 
 // ==================== PLAYER SAVE SYSTEM ====================
 export interface SavedDeck {
@@ -119,13 +185,32 @@ export interface SessionState {
   sessionWon: boolean | null;
 }
 
-export type TurnPhase = 'player_action' | 'targeting' | 'resolving' | 'opponent_turn' | 'drawing';
+// ==================== TURN PHASE ====================
+export const TURN_PHASE = {
+  PLAYER_ACTION: 'player_action',
+  TARGETING: 'targeting',
+  RESOLVING: 'resolving',
+  OPPONENT_TURN: 'opponent_turn',
+  DRAWING: 'drawing',
+} as const;
+
+export type TurnPhase = typeof TURN_PHASE[keyof typeof TURN_PHASE];
+
+// ==================== COMBAT LOG ACTOR ====================
+export const COMBAT_LOG_ACTOR = {
+  PLAYER: 'player',
+  OPPONENT: 'opponent',
+  SYSTEM: 'system',
+  JUDGE: 'judge',
+} as const;
+
+export type CombatLogActor = typeof COMBAT_LOG_ACTOR[keyof typeof COMBAT_LOG_ACTOR];
 
 export interface CombatLogEntry {
   id: string;
   timestamp: number;
   turn: number;
-  actor: 'player' | 'opponent' | 'system' | 'judge';
+  actor: CombatLogActor;
   action: string;
   details: Record<string, unknown>;
   stateDelta?: {
@@ -185,7 +270,7 @@ export interface GameState {
   history: Element[];
   harmonyStreak: number; // Count of consecutive cards played in harmony cycle
   isGameOver: boolean;
-  winner: 'player' | 'opponent' | null;
+  winner: CombatLogActor | null;
   turnNumber?: number;
   turnPhase?: TurnPhase;
   // Targeting system

@@ -1,17 +1,17 @@
-import { Element } from '../../types/game';
+import { Element, ELEMENT } from '../../types/game';
 import ElementIcon from './ElementIcon';
 
 interface WuxingCompassProps {
   lastElement: Element | null;
 }
 
-const ELEMENT_ORDER: Element[] = ['wood', 'fire', 'earth', 'metal', 'water'];
+const ELEMENT_ORDER: Element[] = [ELEMENT.WOOD, ELEMENT.FIRE, ELEMENT.EARTH, ELEMENT.METAL, ELEMENT.WATER];
 const ELEMENT_POSITIONS: Record<Element, number> = {
-  wood: 0,
-  fire: 1,
-  earth: 2,
-  metal: 3,
-  water: 4,
+  [ELEMENT.WOOD]: 0,
+  [ELEMENT.FIRE]: 1,
+  [ELEMENT.EARTH]: 2,
+  [ELEMENT.METAL]: 3,
+  [ELEMENT.WATER]: 4,
 };
 
 const ELEMENT_ANGLES: Record<number, number> = {

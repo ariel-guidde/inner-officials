@@ -1,4 +1,4 @@
-import { GameState, Card, Element, Intention, JudgeEffects, BoardEffect, IntentionModifier, GameEvent } from '../types/game';
+import { GameState, Card, Element, Intention, JudgeEffects, BoardEffect, IntentionModifier, GameEvent, ELEMENT, INTENTION_TYPE, IntentionType, EFFECT_TRIGGER, BOARD_EFFECT_TYPE, GAME_EVENT_TYPE, COMBAT_LOG_ACTOR } from '../types/game';
 import { combatLogger } from './debug/combatLogger';
 import { OPPONENTS, JUDGE_ACTIONS, FLUSTERED_EFFECTS } from '../data/opponents';
 import { processEffects, tickEffects, addActiveEffect } from './effects';
@@ -54,8 +54,8 @@ const checkTrapEffects = (state: GameState, intention: Intention): { state: Game
   let modifiedIntention: Intention | null = intention;
 
   // Check for negate_next_attack
-  const negateEffect = nextState.boardEffects.find(e => e.effectType === 'negate_next_attack');
-  if (negateEffect && intention.type === 'attack') {
+  const negateEffect = nextState.boardEffects.find(e => e.effectType === BOARD_EFFECT_TYPE.NEGATE_NEXT_ATTACK);
+  if (negateEffect && intention.type === INTENTION_TYPE.ATTACK) {
     // Remove the effect and negate the attack
     nextState = removeBoardEffect(nextState, negateEffect.id);
     combatLogger.log('system', `${negateEffect.name} negated the attack!`, { effect: negateEffect.name });
@@ -134,8 +134,8 @@ export const addRevealEffect = (state: GameState, count: number = 1): GameState 
   const newState = addActiveEffect(state, {
     name: 'Keen Insight',
     description: `Reveal next ${count} intention(s)`,
-    element: 'metal',
-    trigger: 'passive',
+    element: ELEMENT.METAL,
+    trigger: EFFECT_TRIGGER.PASSIVE,
     remainingTurns: -1,
     remainingTriggers: count,
     apply: (s) => s, // Passive - actual reveal is in canSeeNextIntention
@@ -340,7 +340,7 @@ const trackPatienceSpent = (state: GameState, patienceSpent: number): GameState 
 
         // Emit judge decree event
         nextState = emitGameEvent(nextState, {
-          type: 'judge_decree',
+          type: GAME_EVENT_TYPE.JUDGE_DECREE,
           name: judgeAction.name,
           description: judgeAction.description,
         });
@@ -460,7 +460,7 @@ export const processStartTurn = (state: GameState): GameState => {
   let nextState = { ...state };
 
   // Process turn_start effects (e.g., healing, poise gain)
-  nextState = processEffects(nextState, 'turn_start');
+  nextState = processEffects(nextState, EFFECT_TRIGGER.TURN_START);
 
   return nextState;
 };
@@ -486,10 +486,10 @@ const executeOpponentAction = (state: GameState, intention: Intention): GameStat
   // If intention was negated, emit event and return
   if (!modifiedIntention) {
     nextState = emitGameEvent(nextState, {
-      type: 'opponent_action',
+      type: GAME_EVENT_TYPE.OPPONENT_ACTION,
       name: intention.name,
       description: 'Attack was negated!',
-      actionType: intention.type as 'attack' | 'favor' | 'stall',
+      actionType: intention.type as IntentionType,
       value: 0,
       statChanges: {},
     });
@@ -499,12 +499,12 @@ const executeOpponentAction = (state: GameState, intention: Intention): GameStat
   // Track stat changes for event emission
   let statChanges: { playerFace?: number; playerFavor?: number } = {};
 
-  if (modifiedIntention.type === 'attack') {
+  if (modifiedIntention.type === INTENTION_TYPE.ATTACK) {
     const baseDamage = Math.floor(modifiedIntention.value * judgeEffects.damageModifier);
 
     // Check for on_damage active effects that reduce damage
     let finalDamage = baseDamage;
-    const damageReductionEffects = nextState.activeEffects.filter(e => e.trigger === 'on_damage');
+    const damageReductionEffects = nextState.activeEffects.filter(e => e.trigger === EFFECT_TRIGGER.ON_DAMAGE);
     for (const effect of damageReductionEffects) {
       // Apply the effect (which may modify the state and provide damage reduction)
       nextState = effect.apply(nextState);
@@ -536,7 +536,7 @@ const executeOpponentAction = (state: GameState, intention: Intention): GameStat
       face: nextState.player.face - damage,
     };
     statChanges.playerFace = nextState.player.face - previousFace;
-  } else if (modifiedIntention.type === 'favor') {
+  } else if (modifiedIntention.type === INTENTION_TYPE.FAVOR) {
     const favorSteal = modifiedIntention.value;
     const previousFavor = nextState.player.favor;
     nextState.player = {
@@ -548,19 +548,19 @@ const executeOpponentAction = (state: GameState, intention: Intention): GameStat
       favor: Math.min(100, nextState.opponent.favor + favorSteal),
     };
     statChanges.playerFavor = nextState.player.favor - previousFavor;
-  } else if (modifiedIntention.type === 'stall') {
+  } else if (modifiedIntention.type === INTENTION_TYPE.STALL) {
     nextState.patience -= modifiedIntention.value;
-  } else if (modifiedIntention.type === 'flustered') {
+  } else if (modifiedIntention.type === INTENTION_TYPE.FLUSTERED) {
     // Flustered does nothing - opponent wastes their action
     combatLogger.logSystemEvent('Opponent Flustered', { effect: modifiedIntention.name });
   }
 
   // Emit opponent action event
   nextState = emitGameEvent(nextState, {
-    type: 'opponent_action',
+    type: GAME_EVENT_TYPE.OPPONENT_ACTION,
     name: modifiedIntention.name,
     description: getIntentionDescription(modifiedIntention),
-    actionType: modifiedIntention.type as 'attack' | 'favor' | 'stall',
+    actionType: modifiedIntention.type as IntentionType,
     value: modifiedIntention.value,
     statChanges,
   });
@@ -579,13 +579,13 @@ const executeOpponentAction = (state: GameState, intention: Intention): GameStat
 // Helper to get intention description
 const getIntentionDescription = (intention: Intention): string => {
   switch (intention.type) {
-    case 'attack':
+    case INTENTION_TYPE.ATTACK:
       return `Deals ${intention.value} damage`;
-    case 'favor':
+    case INTENTION_TYPE.FAVOR:
       return `Steals ${intention.value} favor`;
-    case 'stall':
+    case INTENTION_TYPE.STALL:
       return `Drains ${intention.value} patience`;
-    case 'flustered':
+    case INTENTION_TYPE.FLUSTERED:
       return 'Opponent is flustered!';
     default:
       return '';
@@ -617,30 +617,30 @@ export const resolveAIAction = (state: GameState): GameState => {
 };
 
 const checkBalanced = (last: Element | null, current: Element) => {
-  const cycle: Element[] = ['wood', 'fire', 'earth', 'metal', 'water'];
+  const cycle: Element[] = [ELEMENT.WOOD, ELEMENT.FIRE, ELEMENT.EARTH, ELEMENT.METAL, ELEMENT.WATER];
   if (!last) return true; // First move is in harmony
   return cycle[(cycle.indexOf(last) + 1) % 5] === current;
 };
 
 const checkChaos = (last: Element | null, current: Element) => {
-  const cycle: Element[] = ['wood', 'fire', 'earth', 'metal', 'water'];
+  const cycle: Element[] = [ELEMENT.WOOD, ELEMENT.FIRE, ELEMENT.EARTH, ELEMENT.METAL, ELEMENT.WATER];
   if (!last) return false;
   return cycle[(cycle.indexOf(last) + 2) % 5] === current;
 };
 
 const checkVictory = (s: GameState): GameState => {
-  if (s.player.face <= 0) return { ...s, isGameOver: true, winner: 'opponent' };
-  if (s.player.favor >= 100) return { ...s, isGameOver: true, winner: 'player' };
-  if (s.opponent.favor >= 100) return { ...s, isGameOver: true, winner: 'opponent' };
+  if (s.player.face <= 0) return { ...s, isGameOver: true, winner: COMBAT_LOG_ACTOR.OPPONENT };
+  if (s.player.favor >= 100) return { ...s, isGameOver: true, winner: COMBAT_LOG_ACTOR.PLAYER };
+  if (s.opponent.favor >= 100) return { ...s, isGameOver: true, winner: COMBAT_LOG_ACTOR.OPPONENT };
   if (s.patience <= 0) {
     // When patience runs out, compare favor
     if (s.player.favor > s.opponent.favor) {
-      return { ...s, isGameOver: true, winner: 'player' };
+      return { ...s, isGameOver: true, winner: COMBAT_LOG_ACTOR.PLAYER };
     } else if (s.opponent.favor > s.player.favor) {
-      return { ...s, isGameOver: true, winner: 'opponent' };
+      return { ...s, isGameOver: true, winner: COMBAT_LOG_ACTOR.OPPONENT };
     } else {
       // Tie goes to player if they have at least 50 favor
-      return { ...s, isGameOver: true, winner: s.player.favor >= 50 ? 'player' : 'opponent' };
+      return { ...s, isGameOver: true, winner: s.player.favor >= 50 ? COMBAT_LOG_ACTOR.PLAYER : COMBAT_LOG_ACTOR.OPPONENT };
     }
   }
   return s;

@@ -1,4 +1,4 @@
-import { Element } from '../../../types/game';
+import { Element, ELEMENT } from '../../../types/game';
 import ElementIcon from '../ElementIcon';
 
 interface WuxingIndicatorProps {
@@ -6,7 +6,7 @@ interface WuxingIndicatorProps {
   harmonyStreak: number;
 }
 
-const ELEMENT_ORDER: Element[] = ['wood', 'fire', 'earth', 'metal', 'water'];
+const ELEMENT_ORDER: Element[] = [ELEMENT.WOOD, ELEMENT.FIRE, ELEMENT.EARTH, ELEMENT.METAL, ELEMENT.WATER];
 const HARMONY_THRESHOLD = 5;
 
 export default function WuxingIndicator({ lastElement, harmonyStreak }: WuxingIndicatorProps) {
