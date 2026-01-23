@@ -5,6 +5,7 @@ import ElementIcon from '../ElementIcon';
 interface CardTooltipProps {
   card: Card;
   canAfford: boolean;
+  playabilityReason?: string;
 }
 
 const ELEMENT_COLORS: Record<Element, string> = {
@@ -15,7 +16,7 @@ const ELEMENT_COLORS: Record<Element, string> = {
   water: 'border-blue-500 bg-blue-950/90',
 };
 
-export default function CardTooltip({ card, canAfford }: CardTooltipProps) {
+export default function CardTooltip({ card, canAfford, playabilityReason }: CardTooltipProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -33,8 +34,8 @@ export default function CardTooltip({ card, canAfford }: CardTooltipProps) {
         </div>
       </div>
       <p className="text-sm text-stone-300 leading-relaxed">{card.description}</p>
-      {!canAfford && (
-        <div className="mt-2 text-xs text-red-400 italic">Not enough resources</div>
+      {!canAfford && playabilityReason && (
+        <div className="mt-2 text-xs text-red-400 italic">{playabilityReason}</div>
       )}
     </motion.div>
   );

@@ -6,6 +6,10 @@ export interface DeckOperations {
   drawCards: (state: GameState, count: number) => GameState;
   discardHand: (state: GameState) => GameState;
   removeFromHand: (state: GameState, cardId: string) => GameState;
+  removeFromPlay: (state: GameState, cardId: string) => GameState;
+  discardCard: (state: GameState, cardId: string) => GameState; // Explicit discard to discard pile
+  burnCard: (state: GameState, cardId: string) => GameState; // Burn = remove from play
+  burnRandomCard: (state: GameState, filter?: (card: Card) => boolean) => GameState; // Random burn
   shuffleDeck: (deck: Card[]) => Card[];
 }
 
@@ -65,35 +69,84 @@ export function useDeck(): DeckOperations {
 
   const removeFromHand = useCallback((state: GameState, cardId: string): GameState => {
     const card = state.player.hand.find(c => c.id === cardId);
-    const newHand = state.player.hand.filter((c) => c.id !== cardId);
+    const isNeedToRemoveFromGame = card?.isBad || card?.removeAfterPlay === true;
 
-    // If it's a bad card or fire card that removes after play, remove from game entirely
-    if (card?.isBad || card?.removeAfterPlay) {
-      return {
-        ...state,
-        player: {
-          ...state.player,
-          hand: newHand,
-          removedFromGame: [...state.player.removedFromGame, card],
-        },
-      };
+    if (isNeedToRemoveFromGame) {
+      return removeFromPlay(state, cardId);
     }
+    else {
+      return discardCard(state, cardId);
+    }
+  }, []);
 
-    // Normal cards go to discard
+  const removeFromPlay = useCallback((state: GameState, cardId: string): GameState => {
+    const card = state.player.hand.find(c => c.id === cardId);
+    const newHand = state.player.hand.filter((c) => c.id !== cardId);
+    const newRemovedFromGame = [...state.player.removedFromGame, ...(card ? [card] : [])];
+
     return {
       ...state,
       player: {
         ...state.player,
         hand: newHand,
-        discard: [...state.player.discard, ...(card ? [card] : [])],
+        removedFromGame: newRemovedFromGame,
       },
     };
   }, []);
+
+  const discardCard = useCallback((state: GameState, cardId: string): GameState => {
+    const card = state.player.hand.find(c => c.id === cardId);
+    const newHand = state.player.hand.filter((c) => c.id !== cardId);
+    const newDiscard = [...state.player.discard, ...(card ? [card] : [])];
+
+    return {
+      ...state,
+      player: {
+        ...state.player,
+        hand: newHand,
+        discard: newDiscard,
+      },
+    };
+  }, []);
+
+  const burnCard = useCallback((state: GameState, cardId: string): GameState => {
+    const card = state.player.hand.find(c => c.id === cardId);
+    const newHand = state.player.hand.filter((c) => c.id !== cardId);
+
+    return {
+      ...state,
+      player: {
+        ...state.player,
+        hand: newHand,
+        removedFromGame: [...state.player.removedFromGame, ...(card ? [card] : [])],
+      },
+    };
+  }, []);
+
+  const burnRandomCard = useCallback((state: GameState, filter?: (card: Card) => boolean): GameState => {
+    let candidates = state.player.hand;
+    if (filter) {
+      candidates = candidates.filter(filter);
+    }
+    
+    if (candidates.length === 0) {
+      return state; // No cards to burn
+    }
+
+    const randomIndex = Math.floor(Math.random() * candidates.length);
+    const cardToBurn = candidates[randomIndex];
+    
+    return burnCard(state, cardToBurn.id);
+  }, [burnCard]);
 
   return {
     drawCards,
     discardHand,
     removeFromHand,
+    removeFromPlay,
+    discardCard,
+    burnCard,
+    burnRandomCard,
     shuffleDeck,
   };
 }

@@ -6,6 +6,7 @@ import CardTooltip from './CardTooltip';
 interface CardInHandProps {
   card: Card;
   canAfford: boolean;
+  playabilityReason?: string;
   position: {
     x: number;
     y: number;
@@ -42,6 +43,7 @@ const BAD_CARD_BG = 'bg-gradient-to-b from-rose-950/80 via-stone-950 to-stone-90
 export default function CardInHand({
   card,
   canAfford,
+  playabilityReason,
   position,
   index,
   isHovered,
@@ -89,7 +91,7 @@ export default function CardInHand({
       {/* Tooltip */}
       <AnimatePresence>
         {isHovered && (
-          <CardTooltip card={card} canAfford={canAfford} />
+          <CardTooltip card={card} canAfford={canAfford} playabilityReason={playabilityReason} />
         )}
       </AnimatePresence>
 

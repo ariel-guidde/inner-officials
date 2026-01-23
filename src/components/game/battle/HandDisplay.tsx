@@ -1,21 +1,23 @@
 import { useState, useMemo } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { Card } from '../../../types/game';
+import { Card, GameState } from '../../../types/game';
 import CardInHand from './CardInHand';
 import { calculateCardPositions, getHandWidth, HandHoverState } from '../../../lib/cardLayout';
+import { isCardPlayable } from '../../../lib/playability';
 
 interface HandDisplayProps {
   cards: Card[];
   patience: number;
   playerFace: number;
   playerPoise?: number;
+  gameState: GameState;
   onPlayCard: (card: Card) => void;
   disabled?: boolean;
 }
 
 const CARD_WIDTH = 128; // w-32 = 8rem = 128px
 
-export default function HandDisplay({ cards, patience, playerFace, playerPoise = 0, onPlayCard, disabled = false }: HandDisplayProps) {
+export default function HandDisplay({ cards, patience: _patience, playerFace: _playerFace, playerPoise = 0, gameState, onPlayCard, disabled = false }: HandDisplayProps) {
   const [isHandHovered, setIsHandHovered] = useState(false);
   const [hoveredCardIndex, setHoveredCardIndex] = useState<number | null>(null);
 
@@ -58,14 +60,15 @@ export default function HandDisplay({ cards, patience, playerFace, playerPoise =
         >
           <AnimatePresence mode="popLayout">
             {cards.map((card, index) => {
-              // Face cost can be paid with poise first, then face
-              const effectiveFacePool = playerPoise + playerFace;
-              const canAfford = !disabled && patience >= card.patienceCost && effectiveFacePool >= card.faceCost;
+              // Check playability (includes cost checks and requirement checks)
+              const playability = isCardPlayable(card, gameState, playerPoise);
+              const canAfford = !disabled && playability.playable;
               return (
                 <CardInHand
                   key={card.id}
                   card={card}
                   canAfford={canAfford}
+                  playabilityReason={playability.reason}
                   position={positions[index]}
                   index={index}
                   isHovered={hoveredCardIndex === index}

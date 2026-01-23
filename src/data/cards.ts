@@ -65,6 +65,35 @@ export const DEBATE_DECK: Card[] = [
   { id: 'wa8', name: 'Still Waters', element: 'water', patienceCost: 1, faceCost: 0,
     description: 'Gain 8 Favor.',
     effect: (s) => adjustFavor(s, 8) },
+  // New water card with discard requirement
+  { id: 'wa9', name: 'Turbulent Flow', element: 'water', patienceCost: 2, faceCost: 0,
+    description: 'Discard a card, then draw 3 cards.',
+    effect: (s) => s,
+    targetRequirement: {
+      type: 'hand_card',
+      destination: 'discard',
+      selectionMode: 'choose',
+      filter: (c, _state) => c.id !== 'wa9',
+      isPlayRequirement: true,
+      prompt: 'Choose a card to discard',
+    },
+    targetedEffect: (s, targets, drawCards) => {
+      // Card will be discarded by game logic, then draw
+      return drawCards ? drawCards(s, 3) : s;
+    },
+  },
+  // New fire card with random burn
+  { id: 'f9', name: 'Wildfire', element: 'fire', patienceCost: 2, faceCost: 10,
+    description: 'Burn a random card from hand. Deal 30 Shame.',
+    effect: (s) => adjustOpponentFace(s, -30),
+    targetRequirement: {
+      type: 'hand_card',
+      destination: 'burn',
+      selectionMode: 'random',
+      filter: (c, _state) => c.id !== 'f9',
+      isPlayRequirement: true,
+    },
+  },
 
   // ==================== WOOD (Timed Effects) ====================
   // Wood grows slowly - effects that build over time
@@ -140,19 +169,22 @@ export const DEBATE_DECK: Card[] = [
     description: 'Gain 25 Favor. Removed after use.',
     effect: (s) => adjustFavor(s, 25), removeAfterPlay: true },
   { id: 'f2', name: 'Purifying Flames', element: 'fire', patienceCost: 1, faceCost: 5,
-    description: 'Discard a card. Gain Favor equal to its patience cost x5.',
+    description: 'Burn a card. Gain Favor equal to its patience cost x5.',
     effect: (s) => s, // Base effect does nothing, targeted effect handles it
     targetRequirement: {
       type: 'hand_card',
+      destination: 'burn',
+      selectionMode: 'choose',
       filter: (c, _state) => c.id !== 'f2', // Can't target self
+      isPlayRequirement: true, // Must have a card to burn
       prompt: 'Choose a card to burn for Favor',
     },
-    targetedEffect: (s, targets) => {
+    targetedEffect: (s, targets, drawCards) => {
       if (!targets.selectedCards || targets.selectedCards.length === 0) return s;
       const targetCard = targets.selectedCards[0];
       const favorGain = targetCard.patienceCost * 5;
-      let nextState = removeCardFromHand(s, targetCard.id);
-      return adjustFavor(nextState, favorGain);
+      // Card will be burned by the game logic based on destination
+      return adjustFavor(s, favorGain);
     },
   },
   { id: 'f3', name: 'Dragons Heart', element: 'fire', patienceCost: 2, faceCost: 20,
@@ -162,30 +194,22 @@ export const DEBATE_DECK: Card[] = [
     description: 'Deal 40 Shame.',
     effect: (s) => adjustOpponentFace(s, -40) },
   { id: 'f5', name: 'Cleansing Fire', element: 'fire', patienceCost: 2, faceCost: 8,
-    description: 'Remove a Bad card from hand. Gain 20 Favor.',
+    description: 'Burn a Bad card from hand. Gain 20 Favor.',
     effect: (s) => s,
     targetRequirement: {
       type: 'hand_card',
+      destination: 'burn',
+      selectionMode: 'choose',
       filter: (c) => c.isBad === true,
       optional: true,
-      prompt: 'Choose a Bad card to cleanse',
+      prompt: 'Choose a Bad card to burn',
     },
     targetedEffect: (s, targets) => {
-      let nextState = s;
+      // Card will be burned by game logic, just gain favor if target selected
       if (targets.selectedCards && targets.selectedCards.length > 0) {
-        const targetCard = targets.selectedCards[0];
-        // Remove bad card from game entirely
-        nextState = {
-          ...nextState,
-          player: {
-            ...nextState.player,
-            hand: nextState.player.hand.filter(c => c.id !== targetCard.id),
-            removedFromGame: [...nextState.player.removedFromGame, targetCard],
-          },
-        };
-        nextState = adjustFavor(nextState, 20);
+        return adjustFavor(s, 20);
       }
-      return nextState;
+      return s;
     },
   },
   { id: 'f6', name: 'Phoenix Ascent', element: 'fire', patienceCost: 3, faceCost: 25,

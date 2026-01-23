@@ -11,11 +11,16 @@ export type DrawCardsFunction = (state: GameState, count: number) => GameState;
 
 // ==================== TARGETING SYSTEM ====================
 export type TargetType = 'none' | 'hand_card';
+export type CardDestination = 'discard' | 'burn'; // discard = goes to discard pile, burn = removed from play
 
 export interface TargetRequirement {
   type: TargetType;
+  destination?: CardDestination; // Where selected cards go
+  selectionMode?: 'choose' | 'random'; // User choice vs random
+  count?: number; // How many cards (default 1)
   filter?: (card: Card, state: GameState) => boolean;
   optional?: boolean;
+  isPlayRequirement?: boolean; // If true, card is unplayable without valid targets
   prompt?: string;
 }
 
@@ -142,8 +147,8 @@ export interface GameState {
     hand: Card[];
     deck: Card[];
     discard: Card[];
-    removedFromGame: Card[];             // Bad cards removed from the game
-    canSeeNextIntention: boolean;        // Revealed by metal cards
+    removedFromGame: Card[];             
+    canSeeNextIntention: boolean;        
   };
   opponent: {
     name: string;

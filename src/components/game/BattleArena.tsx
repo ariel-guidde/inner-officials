@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import BattleLayout from './battle/BattleLayout';
 import WuxingIndicator from './battle/WuxingIndicator';
 import OpponentInfoPanel from './battle/OpponentInfoPanel';
@@ -11,6 +12,7 @@ import DebugPanel from '../debug/DebugPanel';
 import TargetingOverlay from './battle/TargetingOverlay';
 import EventAnnouncement from './battle/EventAnnouncement';
 import ActiveEffectsDisplay from './battle/ActiveEffectsDisplay';
+import PileViewerModal, { PileType } from './battle/PileViewerModal';
 import { GameState, Card, SessionState, TargetRequirement, GameEvent } from '../../types/game';
 import { DebugInterface } from '../../hooks/useGameLogic';
 
@@ -45,6 +47,29 @@ interface BattleArenaProps {
 
 export default function BattleArena({ onBack, session, state, playCard, endTurn, debug, targeting, events }: BattleArenaProps) {
   const isBlocking = events?.isBlocking ?? false;
+  const [pileViewer, setPileViewer] = useState<{ type: PileType; isOpen: boolean }>({
+    type: 'deck',
+    isOpen: false,
+  });
+
+  const openPileViewer = (type: PileType) => {
+    setPileViewer({ type, isOpen: true });
+  };
+
+  const closePileViewer = () => {
+    setPileViewer({ type: 'deck', isOpen: false });
+  };
+
+  const getPileCards = (type: PileType): Card[] => {
+    switch (type) {
+      case 'deck':
+        return state.player.deck;
+      case 'discard':
+        return state.player.discard;
+      case 'removed':
+        return state.player.removedFromGame;
+    }
+  };
 
   return (
     <>
@@ -86,6 +111,10 @@ export default function BattleArena({ onBack, session, state, playCard, endTurn,
           <DeckDisplay
             deckCount={state.player.deck.length}
             discardCount={state.player.discard.length}
+            removedCount={state.player.removedFromGame.length}
+            onDeckClick={() => openPileViewer('deck')}
+            onDiscardClick={() => openPileViewer('discard')}
+            onRemovedClick={() => openPileViewer('removed')}
           />
         }
         hand={
@@ -94,6 +123,7 @@ export default function BattleArena({ onBack, session, state, playCard, endTurn,
             patience={state.patience}
             playerFace={state.player.face}
             playerPoise={state.player.poise}
+            gameState={state}
             onPlayCard={playCard}
             disabled={isBlocking || (targeting?.isTargeting ?? false)}
           />
@@ -141,6 +171,14 @@ export default function BattleArena({ onBack, session, state, playCard, endTurn,
       {events && (
         <EventAnnouncement event={events.currentEvent} />
       )}
+
+      {/* Pile Viewer Modal */}
+      <PileViewerModal
+        isOpen={pileViewer.isOpen}
+        pileType={pileViewer.type}
+        cards={getPileCards(pileViewer.type)}
+        onClose={closePileViewer}
+      />
     </>
   );
 }

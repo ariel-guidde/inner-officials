@@ -99,20 +99,57 @@ export function useGameLogic(config: BattleConfig = {}) {
   const eventQueue = useEventQueue();
   const { state, updateState, getHistory, resetState } = useGameState(() => createInitialState(config));
 
-  // Internal function to execute a card (either directly or after targeting)
   const executeCard = useCallback(
     (card: Card, targetContext?: TargetedEffectContext) => {
       updateState((prevState) => {
         if (prevState.isGameOver) return prevState;
         if (prevState.patience < 0) return prevState;
 
-        // Set phase to resolving
         let nextState = turnFlow.setPhase(prevState, 'resolving');
 
-        // Process the Player's Move (costs and effects)
+        // Handle random selection if needed (before main effect)
+        if (card.targetRequirement?.selectionMode === 'random' && !targetContext) {
+          const req = card.targetRequirement;
+          // Get valid targets
+          let candidates = nextState.player.hand.filter(c => c.id !== card.id);
+          if (req.filter) {
+            candidates = candidates.filter(c => req.filter!(c, nextState));
+          }
+          
+          if (candidates.length > 0) {
+            const randomIndex = Math.floor(Math.random() * candidates.length);
+            const selectedCard = candidates[randomIndex];
+            
+            // Apply destination (burn or discard)
+            if (req.destination === 'burn') {
+              nextState = deck.burnCard(nextState, selectedCard.id);
+            } else if (req.destination === 'discard') {
+              nextState = deck.discardCard(nextState, selectedCard.id);
+            }
+            
+            // Create target context for the effect
+            targetContext = { selectedCards: [selectedCard] };
+          }
+        }
+
+        // Handle targeted effects with selected cards
+        if (card.targetRequirement && targetContext?.selectedCards) {
+          const req = card.targetRequirement;
+          
+          // Apply destination for selected cards (burn or discard)
+          if (req.destination === 'burn') {
+            targetContext.selectedCards.forEach(targetCard => {
+              nextState = deck.burnCard(nextState, targetCard.id);
+            });
+          } else if (req.destination === 'discard') {
+            targetContext.selectedCards.forEach(targetCard => {
+              nextState = deck.discardCard(nextState, targetCard.id);
+            });
+          }
+        }
+
         nextState = processTurn(nextState, card, deck.drawCards);
 
-        // If card has a targeted effect and we have targets, apply it
         if (card.targetedEffect && targetContext) {
           nextState = card.targetedEffect(nextState, targetContext, deck.drawCards);
         }
@@ -134,8 +171,12 @@ export function useGameLogic(config: BattleConfig = {}) {
 
   const playCard = useCallback(
     (card: Card) => {
-      // Check if card requires targeting
-      if (card.targetRequirement && card.targetRequirement.type !== 'none') {
+      // Check if card requires targeting (only for 'choose' mode, not 'random')
+      if (
+        card.targetRequirement && 
+        card.targetRequirement.type !== 'none' &&
+        card.targetRequirement.selectionMode !== 'random'
+      ) {
         // Start targeting mode
         const needsTargeting = targeting.startTargeting(card, state);
         if (needsTargeting) {
@@ -146,7 +187,7 @@ export function useGameLogic(config: BattleConfig = {}) {
         // If optional targeting with no valid targets, proceed without targets
       }
 
-      // Execute card directly (no targeting needed)
+      // Execute card directly (no targeting needed, or random selection handled in executeCard)
       executeCard(card);
     },
     [state, targeting, updateState, turnFlow, executeCard]
