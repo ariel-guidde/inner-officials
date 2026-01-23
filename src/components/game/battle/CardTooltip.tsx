@@ -1,11 +1,13 @@
 import { motion } from 'framer-motion';
-import { Card, Element } from '../../../types/game';
+import { Card, Element, GameState } from '../../../types/game';
 import ElementIcon from '../ElementIcon';
+import { calculateEffectiveCosts, calculateChaosModifiers } from '../../../lib/cardCosts';
 
 interface CardTooltipProps {
   card: Card;
   canAfford: boolean;
   playabilityReason?: string;
+  gameState: GameState;
 }
 
 const ELEMENT_COLORS: Record<Element, string> = {
@@ -16,7 +18,10 @@ const ELEMENT_COLORS: Record<Element, string> = {
   water: 'border-blue-500 bg-blue-950/90',
 };
 
-export default function CardTooltip({ card, canAfford, playabilityReason }: CardTooltipProps) {
+export default function CardTooltip({ card, canAfford, playabilityReason, gameState }: CardTooltipProps) {
+  const effectiveCosts = calculateEffectiveCosts(card, gameState);
+  const chaosModifiers = calculateChaosModifiers(card, gameState);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -29,11 +34,45 @@ export default function CardTooltip({ card, canAfford, playabilityReason }: Card
           <ElementIcon element={card.element} size="sm" />
           <h4 className="font-bold text-amber-100">{card.name}</h4>
         </div>
-        <div className={`text-xs font-mono px-2 py-1 rounded ${canAfford ? 'bg-stone-800 text-stone-200' : 'bg-red-900 text-red-300'}`}>
-          {card.patienceCost}P / {card.faceCost}F
+        <div className={`text-xs font-mono px-2 py-1 rounded ${
+          canAfford 
+            ? effectiveCosts.isReduced 
+              ? 'bg-green-900/70 text-green-200'
+              : effectiveCosts.isIncreased
+                ? 'bg-red-900/70 text-red-200'
+                : 'bg-stone-800 text-stone-200'
+            : 'bg-red-900 text-red-300'
+        }`}>
+          {effectiveCosts.isReduced && (
+            <span className="line-through text-stone-400 mr-1">
+              {effectiveCosts.originalPatienceCost}P{effectiveCosts.originalFaceCost > 0 ? ` / ${effectiveCosts.originalFaceCost}F` : ''}
+            </span>
+          )}
+          <span>
+            {effectiveCosts.effectivePatienceCost}P {effectiveCosts.effectiveFaceCost > 0 && `/ ${effectiveCosts.effectiveFaceCost}F`}
+          </span>
         </div>
       </div>
       <p className="text-sm text-stone-300 leading-relaxed">{card.description}</p>
+      
+      {/* Show chaos bonus effects */}
+      {chaosModifiers && (
+        <div className="mt-2 pt-2 border-t border-stone-700">
+          <div className="text-xs font-semibold text-red-400 mb-1">Chaos Bonus:</div>
+          <div className="text-xs text-green-300 space-y-0.5">
+            <div>+{chaosModifiers.favorGain} Favor</div>
+            <div>+{chaosModifiers.damage} Shame to opponent</div>
+          </div>
+        </div>
+      )}
+
+      {/* Show modifier explanation */}
+      {effectiveCosts.modifier && (
+        <div className={`mt-2 text-xs ${effectiveCosts.isReduced ? 'text-green-400' : effectiveCosts.isIncreased ? 'text-red-400' : 'text-stone-400'}`}>
+          ({effectiveCosts.modifier})
+        </div>
+      )}
+
       {!canAfford && playabilityReason && (
         <div className="mt-2 text-xs text-red-400 italic">{playabilityReason}</div>
       )}

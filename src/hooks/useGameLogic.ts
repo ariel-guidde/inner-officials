@@ -29,20 +29,33 @@ function createInitialState(config: BattleConfig = {}): GameState {
   const { playerStartingFace = DEFAULT_MAX_FACE, opponentIndex = 0, deckCardIds } = config;
 
   // Build deck from saved card IDs or use default
+  // Each card instance gets a unique ID to handle multiple copies
+  let instanceCounter = 0;
+  const createCardInstance = (card: Card): Card => {
+    instanceCounter++;
+    return {
+      ...card,
+      id: `${card.id}_${instanceCounter}_${Date.now()}`,
+    };
+  };
+
   let deckCards: Card[];
   if (deckCardIds && deckCardIds.length > 0) {
-    // Map card IDs to actual Card objects
+    // Map card IDs to actual Card objects with unique instance IDs
     deckCards = deckCardIds
-      .map(id => getCardById(id))
+      .map(id => {
+        const card = getCardById(id);
+        return card ? createCardInstance(card) : undefined;
+      })
       .filter((card): card is Card => card !== undefined);
     
     // Fallback to default if mapping failed
     if (deckCards.length === 0) {
-      deckCards = [...DEBATE_DECK].slice(0, MAX_DECK_SIZE);
+      deckCards = [...DEBATE_DECK].slice(0, MAX_DECK_SIZE).map(createCardInstance);
     }
   } else {
-    // Default: use first MAX_DECK_SIZE cards
-    deckCards = [...DEBATE_DECK].slice(0, MAX_DECK_SIZE);
+    // Default: use first MAX_DECK_SIZE cards with unique instance IDs
+    deckCards = [...DEBATE_DECK].slice(0, MAX_DECK_SIZE).map(createCardInstance);
   }
 
   // Shuffle the deck
@@ -58,8 +71,17 @@ function createInitialState(config: BattleConfig = {}): GameState {
   const currentIntention = pickRandomIntention(opponentTemplate.intentions);
   const nextIntention = pickRandomIntention(opponentTemplate.intentions);
 
-  // Pick initial judge action
+  // Pick initial judge action and apply it immediately
   const initialJudgeAction = JUDGE_ACTIONS[Math.floor(Math.random() * JUDGE_ACTIONS.length)];
+  const initialEffects = initialJudgeAction.apply(DEFAULT_JUDGE_EFFECTS);
+  const initialDecree = {
+    name: initialJudgeAction.name,
+    description: initialJudgeAction.description,
+    turnApplied: 0, // Applied at start
+  };
+
+  // Pick next judge action for after the initial one
+  const nextJudgeAction = JUDGE_ACTIONS[Math.floor(Math.random() * JUDGE_ACTIONS.length)];
 
   return {
     player: {
@@ -83,14 +105,15 @@ function createInitialState(config: BattleConfig = {}): GameState {
       nextIntention: nextIntention,
     },
     judge: {
-      effects: { ...DEFAULT_JUDGE_EFFECTS, activeDecrees: [] },
-      nextEffect: initialJudgeAction.name,
-      patienceThreshold: initialJudgeAction.patienceThreshold,
+      effects: { ...initialEffects, activeDecrees: [initialDecree] },
+      nextEffect: nextJudgeAction.name,
+      patienceThreshold: nextJudgeAction.patienceThreshold,
       patienceSpent: 0,
     },
     patience: 40,
     lastElement: null,
     history: [],
+    harmonyStreak: 0,
     isGameOver: false,
     winner: null,
     turnNumber: 1,

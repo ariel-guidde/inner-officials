@@ -98,29 +98,40 @@ export default function ActiveEffectsDisplay({ activeEffects, boardEffects }: Ac
               ))}
 
               {/* Board Effects (from metal cards) */}
-              {boardEffects.map((effect) => (
-                <div
-                  key={effect.id}
-                  className="px-3 py-2 rounded-lg border border-slate-500/50 bg-slate-900/30"
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2">
-                      <Shield className="w-4 h-4 text-slate-400" />
-                      <span className="text-sm font-medium text-stone-100">
-                        {effect.name}
-                      </span>
+              {boardEffects.map((effect, index) => {
+                // For trap effects like negate_next_attack, show as "1 use" since they trigger once
+                const isTrapEffect = effect.effectType === 'negate_next_attack' || effect.effectType === 'reflect_attack';
+                const displayCount = isTrapEffect ? 1 : effect.turnsRemaining;
+                const countLabel = isTrapEffect ? 'use' : 'turns';
+                
+                return (
+                  <div
+                    key={effect.id}
+                    className={`px-3 py-2 rounded-lg border ${ELEMENT_COLORS.metal}`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <ElementIcon element="metal" size="xs" />
+                        <span className="text-sm font-medium text-stone-100">
+                          {effect.name}
+                        </span>
+                        {index === 0 && boardEffects.length > 1 && (
+                          <span className="text-[10px] text-stone-500">({index + 1}/{boardEffects.length})</span>
+                        )}
+                      </div>
+                      {displayCount !== undefined && (
+                        <div className="flex items-center gap-1 text-xs text-stone-400">
+                          <Shield className="w-3 h-3" />
+                          <span>{displayCount} {countLabel}</span>
+                        </div>
+                      )}
                     </div>
-                    {effect.turnsRemaining !== undefined && (
-                      <span className="text-xs text-stone-400">
-                        {effect.turnsRemaining} turns
-                      </span>
-                    )}
+                    <p className="text-xs text-stone-400">
+                      {getEffectDescription(effect)}
+                    </p>
                   </div>
-                  <p className="text-xs text-stone-400">
-                    {getEffectDescription(effect)}
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </motion.div>
         )}
@@ -140,7 +151,7 @@ export default function ActiveEffectsDisplay({ activeEffects, boardEffects }: Ac
           {boardEffects.slice(0, 3).map((effect) => (
             <div
               key={effect.id}
-              className="px-2 py-0.5 rounded-full text-xs border border-slate-500/50 bg-slate-900/30"
+              className={`px-2 py-0.5 rounded-full text-xs border ${ELEMENT_COLORS.metal}`}
             >
               <span className="text-stone-300">{effect.name}</span>
             </div>

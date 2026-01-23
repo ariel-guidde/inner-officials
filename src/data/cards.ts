@@ -1,6 +1,6 @@
 import { Card, GameState } from '../types/game';
 import { addActiveEffect, createFavorGainEffect, createDamageReductionEffect, createHealingEffect, createPoiseGainEffect } from '../lib/effects';
-import { addBoardEffect, addIntentionModifier, revealNextIntention } from '../lib/engine';
+import { addBoardEffect, addIntentionModifier, addRevealEffect } from '../lib/engine';
 
 // Helper functions for card effects
 const adjustOpponentFace = (s: GameState, val: number) => ({
@@ -226,10 +226,10 @@ export const DEBATE_DECK: Card[] = [
   // Metal is sharp and precise - defensive effects and information control
   { id: 'm1', name: 'Mirror Polish', element: 'metal', patienceCost: 1, faceCost: 0,
     description: 'Reveal opponents next intention.',
-    effect: (s) => revealNextIntention(s) },
+    effect: (s) => addRevealEffect(s, 1) },
   { id: 'm2', name: 'Silver Tongue', element: 'metal', patienceCost: 1, faceCost: 3,
     description: 'Gain 8 Favor, reveal next intention.',
-    effect: (s) => revealNextIntention(adjustFavor(s, 8)) },
+    effect: (s) => addRevealEffect(adjustFavor(s, 8), 1) },
   { id: 'm3', name: 'Iron Curtain', element: 'metal', patienceCost: 3, faceCost: 5,
     description: 'Next opponent attack deals no damage.',
     effect: (s) => addBoardEffect(s, {
@@ -247,7 +247,7 @@ export const DEBATE_DECK: Card[] = [
           value: intention.type === 'attack' ? Math.floor(intention.value / 2) : intention.value,
         }),
       });
-      return revealNextIntention(nextState);
+      return addRevealEffect(nextState, 1);
     } },
   { id: 'm5', name: 'Gilded Edge', element: 'metal', patienceCost: 1, faceCost: 4,
     description: 'Gain 10 Favor.',
@@ -260,7 +260,7 @@ export const DEBATE_DECK: Card[] = [
     effect: (s) => adjustPoise(adjustFavor(s, 12), 12) },
   { id: 'm8', name: 'Steel Resolve', element: 'metal', patienceCost: 1, faceCost: 0,
     description: 'Gain 15 Composure, reveal next intention.',
-    effect: (s) => revealNextIntention(adjustPoise(s, 15)) },
+    effect: (s) => addRevealEffect(adjustPoise(s, 15), 1) },
 
   // ==================== EARTH (Composure Specialist) ====================
   // Earth is stable and grounded - the best source of composure

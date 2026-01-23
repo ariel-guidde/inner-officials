@@ -71,11 +71,29 @@ export function useDeck(): DeckOperations {
     const card = state.player.hand.find(c => c.id === cardId);
     const isNeedToRemoveFromGame = card?.isBad || card?.removeAfterPlay === true;
 
+    // Inline logic to avoid stale closure issues
+    const newHand = state.player.hand.filter((c) => c.id !== cardId);
+
     if (isNeedToRemoveFromGame) {
-      return removeFromPlay(state, cardId);
-    }
-    else {
-      return discardCard(state, cardId);
+      // Remove from game (burn/bad cards)
+      return {
+        ...state,
+        player: {
+          ...state.player,
+          hand: newHand,
+          removedFromGame: [...state.player.removedFromGame, ...(card ? [card] : [])],
+        },
+      };
+    } else {
+      // Discard to discard pile
+      return {
+        ...state,
+        player: {
+          ...state.player,
+          hand: newHand,
+          discard: [...state.player.discard, ...(card ? [card] : [])],
+        },
+      };
     }
   }, []);
 

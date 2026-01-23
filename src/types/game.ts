@@ -183,6 +183,7 @@ export interface GameState {
   patience: number;
   lastElement: Element | null;
   history: Element[];
+  harmonyStreak: number; // Count of consecutive cards played in harmony cycle
   isGameOver: boolean;
   winner: 'player' | 'opponent' | null;
   turnNumber?: number;

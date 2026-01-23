@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Swords, Sparkles, Hourglass, Zap, HelpCircle } from 'lucide-react';
-import { Intention } from '../../../types/game';
+import { Intention, JudgeEffects } from '../../../types/game';
 
 interface OpponentInfoPanelProps {
   name: string;
@@ -12,6 +12,7 @@ interface OpponentInfoPanelProps {
   currentIntention: Intention | null;
   nextIntention: Intention | null;
   canSeeNextIntention: boolean;
+  judgeEffects: JudgeEffects;
 }
 
 const OPPONENT_SPRITES: Record<string, string> = {
@@ -52,6 +53,7 @@ export default function OpponentInfoPanel({
   currentIntention,
   nextIntention,
   canSeeNextIntention,
+  judgeEffects,
 }: OpponentInfoPanelProps) {
   const [showTooltip, setShowTooltip] = useState(false);
   const [showNextTooltip, setShowNextTooltip] = useState(false);
@@ -62,12 +64,22 @@ export default function OpponentInfoPanel({
     ? Math.max(0, currentIntention.patienceThreshold - patienceSpent)
     : 0;
 
+  // Calculate displayed value with modifiers
+  const getDisplayedValue = (intention: Intention | null): number => {
+    if (!intention) return 0;
+    if (intention.type === 'attack') {
+      return Math.floor(intention.value * judgeEffects.damageModifier);
+    }
+    return intention.value;
+  };
+
   const getIntentionDescription = (intention: Intention | null, remaining?: number) => {
     if (!intention) return '';
     if (intention.type === 'flustered') {
-      return INTENTION_DESCRIPTIONS.flustered(0, 0);
+      return `Opponent is flustered and will waste their action (after ${remaining ?? intention.patienceThreshold} more patience spent)`;
     }
-    return INTENTION_DESCRIPTIONS[intention.type]?.(intention.value, remaining ?? intention.patienceThreshold) || '';
+    const displayedValue = getDisplayedValue(intention);
+    return INTENTION_DESCRIPTIONS[intention.type]?.(displayedValue, remaining ?? intention.patienceThreshold) || '';
   };
 
   return (
@@ -137,11 +149,11 @@ export default function OpponentInfoPanel({
             {INTENTION_ICONS[currentIntention?.type || 'attack']}
             <div className="flex-1 min-w-0">
               <span className="text-sm">{currentIntention?.name}</span>
-              {currentIntention && currentIntention.value > 0 && (
-                <span className="text-xs opacity-70 ml-2">{currentIntention.value}</span>
+              {currentIntention && getDisplayedValue(currentIntention) > 0 && (
+                <span className="text-xs opacity-70 ml-2">{getDisplayedValue(currentIntention)}</span>
               )}
             </div>
-            {currentIntention && currentIntention.type !== 'flustered' && (
+            {currentIntention && (
               <div className="flex items-center gap-1 text-xs bg-stone-900/60 px-1.5 py-0.5 rounded">
                 <Hourglass className="w-3 h-3" />
                 <span>{patienceRemaining}</span>
@@ -177,8 +189,8 @@ export default function OpponentInfoPanel({
             >
               {INTENTION_ICONS[nextIntention.type]}
               <span className="text-xs">{nextIntention.name}</span>
-              {nextIntention.value > 0 && (
-                <span className="text-[10px] opacity-70 ml-auto">{nextIntention.value}</span>
+              {getDisplayedValue(nextIntention) > 0 && (
+                <span className="text-[10px] opacity-70 ml-auto">{getDisplayedValue(nextIntention)}</span>
               )}
             </motion.div>
           ) : (

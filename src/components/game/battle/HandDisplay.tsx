@@ -72,6 +72,7 @@ export default function HandDisplay({ cards, patience: _patience, playerFace: _p
                   position={positions[index]}
                   index={index}
                   isHovered={hoveredCardIndex === index}
+                  gameState={gameState}
                   onPlay={disabled ? () => {} : onPlayCard}
                   onHover={disabled ? () => {} : setHoveredCardIndex}
                 />

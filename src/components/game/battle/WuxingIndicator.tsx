@@ -3,11 +3,13 @@ import ElementIcon from '../ElementIcon';
 
 interface WuxingIndicatorProps {
   lastElement: Element | null;
+  harmonyStreak: number;
 }
 
 const ELEMENT_ORDER: Element[] = ['wood', 'fire', 'earth', 'metal', 'water'];
+const HARMONY_THRESHOLD = 5;
 
-export default function WuxingIndicator({ lastElement }: WuxingIndicatorProps) {
+export default function WuxingIndicator({ lastElement, harmonyStreak }: WuxingIndicatorProps) {
   const getNextElement = (element: Element): Element => {
     const currentIndex = ELEMENT_ORDER.indexOf(element);
     return ELEMENT_ORDER[(currentIndex + 1) % 5];
@@ -87,13 +89,19 @@ export default function WuxingIndicator({ lastElement }: WuxingIndicatorProps) {
           );
         })}
 
-        {/* Center */}
+        {/* Center - Show harmony countdown */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-6 h-6 rounded-full bg-stone-800 border border-stone-600 flex items-center justify-center">
-            {lastElement ? (
-              <ElementIcon element={lastElement} size="xs" />
+          <div className="w-10 h-10 rounded-full bg-stone-800 border border-stone-600 flex flex-col items-center justify-center">
+            {harmonyStreak >= HARMONY_THRESHOLD ? (
+              <>
+                <div className="text-[8px] text-green-400 font-bold">HARMONY</div>
+                <ElementIcon element={lastElement!} size="xs" />
+              </>
             ) : (
-              <span className="text-[8px] text-stone-500">?</span>
+              <>
+                <div className="text-xs font-bold text-stone-300">{Math.max(0, HARMONY_THRESHOLD - harmonyStreak)}</div>
+                <div className="text-[6px] text-stone-500">cards</div>
+              </>
             )}
           </div>
         </div>
@@ -102,12 +110,21 @@ export default function WuxingIndicator({ lastElement }: WuxingIndicatorProps) {
       {/* Legend */}
       {lastElement && (
         <div className="space-y-1 text-[10px]">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-green-900/50 ring-1 ring-green-500 flex items-center justify-center">
-              <ElementIcon element={nextElement!} size="xs" />
+          {harmonyStreak >= HARMONY_THRESHOLD ? (
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-green-900/50 ring-1 ring-green-500 flex items-center justify-center">
+                <ElementIcon element={nextElement!} size="xs" />
+              </div>
+              <span className="text-green-400">Harmony Active: -1 Patience</span>
             </div>
-            <span className="text-green-400">Balanced: -1 Patience</span>
-          </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-green-900/50 ring-1 ring-green-500 flex items-center justify-center">
+                <ElementIcon element={nextElement!} size="xs" />
+              </div>
+              <span className="text-stone-400">Balanced: {harmonyStreak}/{HARMONY_THRESHOLD} → Harmony</span>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-red-900/50 ring-1 ring-red-500 flex items-center justify-center">
               <ElementIcon element={chaosElement!} size="xs" />

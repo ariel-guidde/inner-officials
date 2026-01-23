@@ -75,7 +75,7 @@ export default function BattleArena({ onBack, session, state, playCard, endTurn,
     <>
       <BattleLayout
         onBack={onBack}
-        wuxingIndicator={<WuxingIndicator lastElement={state.lastElement} />}
+        wuxingIndicator={<WuxingIndicator lastElement={state.lastElement} harmonyStreak={state.harmonyStreak ?? 0} />}
         opponentPanel={
           <OpponentInfoPanel
             name={state.opponent.name}
@@ -86,6 +86,7 @@ export default function BattleArena({ onBack, session, state, playCard, endTurn,
             currentIntention={state.opponent.currentIntention}
             nextIntention={state.opponent.nextIntention}
             canSeeNextIntention={state.player.canSeeNextIntention}
+            judgeEffects={state.judge.effects}
           />
         }
         judgePanel={
