@@ -8,6 +8,7 @@ import { useGameState } from './useGameState';
 import { useTurnFlow } from './useTurnFlow';
 import { useTargeting } from './useTargeting';
 import { useEventQueue } from './useEventQueue';
+import { getCardById } from '../lib/saveService';
 
 const INITIAL_HAND_SIZE = 5;
 const MAX_DECK_SIZE = 20;
@@ -21,14 +22,31 @@ function pickRandomIntention(intentions: Intention[]): Intention {
 export interface BattleConfig {
   playerStartingFace?: number;
   opponentIndex?: number;
+  deckCardIds?: string[]; // Card IDs from saved deck
 }
 
 function createInitialState(config: BattleConfig = {}): GameState {
-  const { playerStartingFace = DEFAULT_MAX_FACE, opponentIndex = 0 } = config;
+  const { playerStartingFace = DEFAULT_MAX_FACE, opponentIndex = 0, deckCardIds } = config;
 
-  // Limit deck to MAX_DECK_SIZE cards
-  const limitedDeck = [...DEBATE_DECK].slice(0, MAX_DECK_SIZE);
-  const shuffledDeck = limitedDeck.sort(() => Math.random() - 0.5);
+  // Build deck from saved card IDs or use default
+  let deckCards: Card[];
+  if (deckCardIds && deckCardIds.length > 0) {
+    // Map card IDs to actual Card objects
+    deckCards = deckCardIds
+      .map(id => getCardById(id))
+      .filter((card): card is Card => card !== undefined);
+    
+    // Fallback to default if mapping failed
+    if (deckCards.length === 0) {
+      deckCards = [...DEBATE_DECK].slice(0, MAX_DECK_SIZE);
+    }
+  } else {
+    // Default: use first MAX_DECK_SIZE cards
+    deckCards = [...DEBATE_DECK].slice(0, MAX_DECK_SIZE);
+  }
+
+  // Shuffle the deck
+  const shuffledDeck = [...deckCards].sort(() => Math.random() - 0.5);
 
   // Select opponent based on index (cycle through available opponents)
   const opponentTemplate = OPPONENTS[opponentIndex % OPPONENTS.length];

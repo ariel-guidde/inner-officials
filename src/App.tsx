@@ -9,11 +9,13 @@ import BattleSummary from './components/game/BattleSummary';
 import { useGameLogic, BattleConfig } from './hooks/useGameLogic';
 import { useSession } from './hooks/useSession';
 import { useAudio } from './hooks/useAudio';
+import { usePlayerSave } from './hooks/usePlayerSave';
 
 const DEFAULT_CAMPAIGN_BATTLES = 3;
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('menu');
+  const playerSave = usePlayerSave();
   const {
     session,
     lastBattleResult,
@@ -22,10 +24,11 @@ function App() {
     advanceToNextBattle,
   } = useSession(DEFAULT_CAMPAIGN_BATTLES);
 
-  // Battle config based on session state
+  // Battle config based on session state and active deck
   const battleConfig: BattleConfig = {
     playerStartingFace: session.playerFaceCarryOver,
     opponentIndex: session.currentBattle - 1,
+    deckCardIds: playerSave.activeDeck?.cardIds,
   };
 
   const { state, playCard, endTurn, startNewBattle, getBattleResult, debug, targeting, events } = useGameLogic(battleConfig);
@@ -58,6 +61,7 @@ function App() {
       startNewBattle({
         playerStartingFace: 60,
         opponentIndex: 0,
+        deckCardIds: playerSave.activeDeck?.cardIds,
       });
     }
     setCurrentScreen(screen);
@@ -72,15 +76,16 @@ function App() {
     startNewBattle({
       playerStartingFace: session.playerFaceCarryOver,
       opponentIndex: session.currentBattle, // This will be incremented after advanceToNextBattle
+      deckCardIds: playerSave.activeDeck?.cardIds,
     });
     setCurrentScreen('battle');
-  }, [advanceToNextBattle, startNewBattle, session.playerFaceCarryOver, session.currentBattle]);
+  }, [advanceToNextBattle, startNewBattle, session.playerFaceCarryOver, session.currentBattle, playerSave.activeDeck]);
 
   switch (currentScreen) {
     case 'menu':
       return <MainMenu onNavigate={handleNavigate} />;
     case 'deck':
-      return <DeckView gameState={state} onBack={handleBack} />;
+      return <DeckView playerSave={playerSave} onBack={handleBack} />;
     case 'how-to-play':
       return <HowToPlay onBack={handleBack} />;
     case 'settings':

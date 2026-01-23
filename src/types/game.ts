@@ -94,6 +94,21 @@ export interface Card {
 
 export type Screen = 'menu' | 'deck' | 'how-to-play' | 'settings' | 'battle' | 'battle-summary';
 
+// ==================== PLAYER SAVE SYSTEM ====================
+export interface SavedDeck {
+  id: string;
+  name: string;
+  cardIds: string[]; // Card IDs with duplicates for multiple copies
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface PlayerSaveData {
+  version: 1;
+  decks: SavedDeck[];
+  activeDeckId: string | null;
+}
+
 // Session state for multi-battle campaigns
 export interface SessionState {
   totalBattles: number;
