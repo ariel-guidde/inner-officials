@@ -1,8 +1,9 @@
+import { forwardRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Element, GameState, ELEMENT } from '../../../types/game';
 import ElementIcon from '../ElementIcon';
 import CardTooltip from './CardTooltip';
-import { calculateEffectiveCosts } from '../../../lib/cardCosts';
+import { calculateEffectiveCosts } from '../../../lib/combat';
 
 interface CardInHandProps {
   card: Card;
@@ -41,7 +42,7 @@ const ELEMENT_BG: Record<Element, string> = {
 // Bad card indicator overlay (doesn't override element colors)
 const BAD_CARD_OVERLAY = 'before:absolute before:inset-0 before:bg-rose-950/20 before:rounded-xl before:pointer-events-none';
 
-export default function CardInHand({
+const CardInHand = forwardRef<HTMLDivElement, CardInHandProps>(function CardInHand({
   card,
   canAfford,
   playabilityReason,
@@ -51,7 +52,7 @@ export default function CardInHand({
   gameState,
   onPlay,
   onHover,
-}: CardInHandProps) {
+}, ref) {
   const isBadCard = card.isBad === true;
   // Keep element colors even for bad cards
   const borderColor = canAfford
@@ -65,6 +66,7 @@ export default function CardInHand({
 
   return (
     <motion.div
+      ref={ref}
       initial={{ y: 200, opacity: 0 }}
       animate={{
         x: position.x,
@@ -163,4 +165,8 @@ export default function CardInHand({
       </motion.button>
     </motion.div>
   );
-}
+});
+
+CardInHand.displayName = 'CardInHand';
+
+export default CardInHand;

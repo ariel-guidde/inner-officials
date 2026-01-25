@@ -91,6 +91,7 @@ export default function BattleArena({ onBack, session, state, playCard, endTurn,
         }
         judgePanel={
           <JudgePanel
+            judgeName={state.judge.name}
             patience={state.patience}
             maxPatience={40}
             playerFavor={state.player.favor}

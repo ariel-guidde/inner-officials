@@ -1,8 +1,10 @@
 import { useCallback, useMemo } from 'react';
 import { GameState, Card, StateHistoryEntry, Intention, TargetedEffectContext, TURN_PHASE, COMBAT_LOG_ACTOR, CARD_DESTINATION } from '../types/game';
 import { DEBATE_DECK } from '../data/cards';
-import { OPPONENTS, JUDGE_ACTIONS } from '../data/opponents';
-import { processTurn, processEndTurn, processStartTurn, DEFAULT_JUDGE_EFFECTS } from '../lib/engine';
+import { OPPONENTS } from '../data/opponents';
+import { JUDGES } from '../data/judges';
+import { processTurn, processEndTurn, processStartTurn, DEFAULT_JUDGE_EFFECTS } from '../lib/combat';
+import { pickRandomJudgeAction } from '../lib/combat/modules/judge';
 import { useDeck } from './useDeck';
 import { useGameState } from './useGameState';
 import { useTurnFlow } from './useTurnFlow';
@@ -71,8 +73,11 @@ function createInitialState(config: BattleConfig = {}): GameState {
   const currentIntention = pickRandomIntention(opponentTemplate.intentions);
   const nextIntention = pickRandomIntention(opponentTemplate.intentions);
 
+  // Randomly select a judge
+  const judgeTemplate = JUDGES[Math.floor(Math.random() * JUDGES.length)];
+
   // Pick initial judge action and apply it immediately
-  const initialJudgeAction = JUDGE_ACTIONS[Math.floor(Math.random() * JUDGE_ACTIONS.length)];
+  const initialJudgeAction = pickRandomJudgeAction(judgeTemplate.judgeActions);
   const initialEffects = initialJudgeAction.apply(DEFAULT_JUDGE_EFFECTS);
   const initialDecree = {
     name: initialJudgeAction.name,
@@ -81,7 +86,7 @@ function createInitialState(config: BattleConfig = {}): GameState {
   };
 
   // Pick next judge action for after the initial one
-  const nextJudgeAction = JUDGE_ACTIONS[Math.floor(Math.random() * JUDGE_ACTIONS.length)];
+  const nextJudgeAction = pickRandomJudgeAction(judgeTemplate.judgeActions);
 
   return {
     player: {
@@ -105,6 +110,7 @@ function createInitialState(config: BattleConfig = {}): GameState {
       nextIntention: nextIntention,
     },
     judge: {
+      name: judgeTemplate.name,
       effects: { ...initialEffects, activeDecrees: [initialDecree] },
       nextEffect: nextJudgeAction.name,
       patienceThreshold: nextJudgeAction.patienceThreshold,

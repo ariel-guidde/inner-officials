@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { Card, Element, GameState, ELEMENT } from '../../../types/game';
 import ElementIcon from '../ElementIcon';
-import { calculateEffectiveCosts, calculateChaosModifiers } from '../../../lib/cardCosts';
+import { calculateEffectiveCosts, calculateChaosModifiers } from '../../../lib/combat';
 
 interface CardTooltipProps {
   card: Card;

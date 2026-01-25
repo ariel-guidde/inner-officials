@@ -3,7 +3,7 @@ import { AnimatePresence } from 'framer-motion';
 import { Card, GameState } from '../../../types/game';
 import CardInHand from './CardInHand';
 import { calculateCardPositions, getHandWidth, HandHoverState } from '../../../lib/cardLayout';
-import { isCardPlayable } from '../../../lib/playability';
+import { isCardPlayable } from '../../../lib/combat';
 
 interface HandDisplayProps {
   cards: Card[];

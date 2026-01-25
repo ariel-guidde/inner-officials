@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Swords, Sparkles, Hourglass, Zap, HelpCircle } from 'lucide-react';
+import { Heart, Swords, Sparkles, Hourglass, Zap, HelpCircle, BookMinus } from 'lucide-react';
 import { Intention, JudgeEffects, INTENTION_TYPE, IntentionType } from '../../../types/game';
 
 interface OpponentInfoPanelProps {
@@ -25,21 +25,24 @@ const OPPONENT_SPRITES: Record<string, string> = {
 
 const INTENTION_ICONS: Record<IntentionType, React.ReactNode> = {
   [INTENTION_TYPE.ATTACK]: <Swords className="w-4 h-4 text-red-400" />,
-  [INTENTION_TYPE.FAVOR]: <Sparkles className="w-4 h-4 text-purple-400" />,
+  [INTENTION_TYPE.FAVOR_GAIN]: <Sparkles className="w-4 h-4 text-purple-400" />,
+  [INTENTION_TYPE.FAVOR_STEAL]: <BookMinus className="w-4 h-4 text-amber-400" />,
   [INTENTION_TYPE.STALL]: <Hourglass className="w-4 h-4 text-amber-400" />,
   [INTENTION_TYPE.FLUSTERED]: <Zap className="w-4 h-4 text-blue-400" />,
 };
 
 const INTENTION_COLORS: Record<IntentionType, string> = {
   [INTENTION_TYPE.ATTACK]: 'intention-attack',
-  [INTENTION_TYPE.FAVOR]: 'intention-favor',
+  [INTENTION_TYPE.FAVOR_GAIN]: 'intention-favor-gain',
+  [INTENTION_TYPE.FAVOR_STEAL]: 'intention-favor-steal',
   [INTENTION_TYPE.STALL]: 'intention-stall',
   [INTENTION_TYPE.FLUSTERED]: 'intention-flustered',
 };
 
 const INTENTION_DESCRIPTIONS: Record<IntentionType, (value: number, remaining: number) => string> = {
   [INTENTION_TYPE.ATTACK]: (value, remaining) => `Will deal ${value} damage to your Face (reduced by Composure) after ${remaining} more patience spent`,
-  [INTENTION_TYPE.FAVOR]: (value, remaining) => `Will steal ${value} Favor from you after ${remaining} more patience spent`,
+  [INTENTION_TYPE.FAVOR_GAIN]: (value, remaining) => `Will gain ${value} Favor after ${remaining} more patience spent (reduced by Composure)`,
+  [INTENTION_TYPE.FAVOR_STEAL]: (value, remaining) => `Will steal ${value} Favor from you after ${remaining} more patience spent`,
   [INTENTION_TYPE.STALL]: (value, remaining) => `Will reduce Patience by ${value} after ${remaining} more patience spent`,
   [INTENTION_TYPE.FLUSTERED]: () => `Opponent is flustered and will waste their action`,
 };

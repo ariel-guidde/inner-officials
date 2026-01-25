@@ -12,7 +12,8 @@ export type Element = typeof ELEMENT[keyof typeof ELEMENT];
 // ==================== INTENTION TYPE ====================
 export const INTENTION_TYPE = {
   ATTACK: 'attack',
-  FAVOR: 'favor',
+  FAVOR_GAIN: 'favor_gain',
+  FAVOR_STEAL: 'favor_steal',
   STALL: 'stall',
   FLUSTERED: 'flustered',
 } as const;
@@ -260,6 +261,7 @@ export interface GameState {
     nextIntention: Intention | null;     // Hidden next intention
   };
   judge: {
+    name: string;                        // Name of the selected judge
     effects: JudgeEffects;
     nextEffect: string | null;           // Description of next judge action
     patienceThreshold: number;           // Patience spent until next judge action

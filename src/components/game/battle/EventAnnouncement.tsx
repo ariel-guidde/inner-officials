@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { GameEvent, GAME_EVENT_TYPE, INTENTION_TYPE } from '../../../types/game';
-import { Gavel, Swords, Heart, Hourglass, Sparkles } from 'lucide-react';
+import { Gavel, Swords, Heart, Hourglass, Sparkles, BookMinus } from 'lucide-react';
 
 interface EventAnnouncementProps {
   event: GameEvent | null;
@@ -23,8 +23,10 @@ export default function EventAnnouncement({ event }: EventAnnouncementProps) {
     switch (event.actionType) {
       case INTENTION_TYPE.ATTACK:
         return <Swords className="w-8 h-8 text-red-400" />;
-      case INTENTION_TYPE.FAVOR:
+      case INTENTION_TYPE.FAVOR_GAIN:
         return <Sparkles className="w-8 h-8 text-purple-400" />;
+      case INTENTION_TYPE.FAVOR_STEAL:
+        return <BookMinus className="w-8 h-8 text-amber-400" />;
       case INTENTION_TYPE.STALL:
         return <Hourglass className="w-8 h-8 text-orange-400" />;
       default:

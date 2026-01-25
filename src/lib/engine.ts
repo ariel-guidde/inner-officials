@@ -1,7 +1,9 @@
 import { GameState, Card, Element, Intention, JudgeEffects, BoardEffect, IntentionModifier, GameEvent, ELEMENT, INTENTION_TYPE, IntentionType, EFFECT_TRIGGER, BOARD_EFFECT_TYPE, GAME_EVENT_TYPE, COMBAT_LOG_ACTOR } from '../types/game';
 import { combatLogger } from './debug/combatLogger';
-import { OPPONENTS, JUDGE_ACTIONS, FLUSTERED_EFFECTS } from '../data/opponents';
+import { OPPONENTS, FLUSTERED_EFFECTS } from '../data/opponents';
+import { JUDGES } from '../data/judges';
 import { processEffects, tickEffects, addActiveEffect } from './effects';
+import { checkJudgeTrigger } from './combat/modules/judge';
 
 type DrawCardsFunction = (state: GameState, count: number) => GameState;
 
@@ -105,11 +107,6 @@ export const emitGameEvent = (state: GameState, event: Omit<GameEvent, 'id'>): G
     ...state,
     pendingEvents: [...state.pendingEvents, newEvent],
   };
-};
-
-// Helper to reveal next intention (legacy - use addRevealEffect instead)
-export const revealNextIntention = (state: GameState): GameState => {
-  return addRevealEffect(state, 1);
 };
 
 // Add reveal effect with counter tracking
@@ -309,42 +306,10 @@ const trackPatienceSpent = (state: GameState, patienceSpent: number): GameState 
       }
 
   // Track for judge
-  const newJudgePatienceSpent = (nextState.judge?.patienceSpent || 0) + patienceSpent;
   if (nextState.judge) {
-    nextState.judge = { ...nextState.judge, patienceSpent: newJudgePatienceSpent };
-
-    // Check if judge action should trigger
-    if (nextState.judge.nextEffect && newJudgePatienceSpent >= nextState.judge.patienceThreshold) {
-      const judgeAction = JUDGE_ACTIONS.find((a) => a.name === nextState.judge.nextEffect);
-      if (judgeAction) {
-        const newEffects = judgeAction.apply(nextState.judge.effects);
-        const newAction = pickRandomJudgeAction();
-        combatLogger.log('judge', `${judgeAction.name}`, { description: judgeAction.description });
-
-        // Accumulate the decree in activeDecrees
-        const newDecree = {
-          name: judgeAction.name,
-          description: judgeAction.description,
-          turnApplied: nextState.turnNumber || 1,
-        };
-
-        nextState.judge = {
-          effects: {
-            ...newEffects,
-            activeDecrees: [...(nextState.judge.effects.activeDecrees || []), newDecree],
-          },
-          nextEffect: newAction.name,
-          patienceThreshold: newAction.patienceThreshold,
-          patienceSpent: 0, // Reset tracking
-        };
-
-        // Emit judge decree event
-        nextState = emitGameEvent(nextState, {
-          type: GAME_EVENT_TYPE.JUDGE_DECREE,
-          name: judgeAction.name,
-          description: judgeAction.description,
-        });
-      }
+    const judgeTemplate = JUDGES.find((j) => j.name === nextState.judge.name);
+    if (judgeTemplate) {
+      nextState = checkJudgeTrigger(nextState, patienceSpent, judgeTemplate.judgeActions);
     }
   }
 
@@ -401,42 +366,10 @@ export const processEndTurn = (state: GameState): GameState => {
 
   // 3. Track patience spent for judge triggers only (opponent already handled above)
   // We need to manually track judge patience since trackPatienceSpent also handles opponent
-  const newJudgePatienceSpent = (nextState.judge?.patienceSpent || 0) + endTurnCost;
   if (nextState.judge) {
-    nextState.judge = { ...nextState.judge, patienceSpent: newJudgePatienceSpent };
-
-    // Check if judge action should trigger
-    if (nextState.judge.nextEffect && newJudgePatienceSpent >= nextState.judge.patienceThreshold) {
-      const judgeAction = JUDGE_ACTIONS.find((a) => a.name === nextState.judge.nextEffect);
-      if (judgeAction) {
-        const newEffects = judgeAction.apply(nextState.judge.effects);
-        const newAction = pickRandomJudgeAction();
-        combatLogger.log('judge', `${judgeAction.name}`, { description: judgeAction.description });
-
-        // Accumulate the decree in activeDecrees
-        const newDecree = {
-          name: judgeAction.name,
-          description: judgeAction.description,
-          turnApplied: nextState.turnNumber || 1,
-        };
-
-        nextState.judge = {
-          effects: {
-            ...newEffects,
-            activeDecrees: [...(nextState.judge.effects.activeDecrees || []), newDecree],
-          },
-          nextEffect: newAction.name,
-          patienceThreshold: newAction.patienceThreshold,
-          patienceSpent: 0, // Reset tracking
-        };
-
-        // Emit judge decree event
-        nextState = emitGameEvent(nextState, {
-          type: 'judge_decree',
-          name: judgeAction.name,
-          description: judgeAction.description,
-        });
-      }
+    const judgeTemplate = JUDGES.find((j) => j.name === nextState.judge.name);
+    if (judgeTemplate) {
+      nextState = checkJudgeTrigger(nextState, endTurnCost, judgeTemplate.judgeActions);
     }
   }
 
@@ -536,7 +469,13 @@ const executeOpponentAction = (state: GameState, intention: Intention): GameStat
       face: nextState.player.face - damage,
     };
     statChanges.playerFace = nextState.player.face - previousFace;
-  } else if (modifiedIntention.type === INTENTION_TYPE.FAVOR) {
+  } else if (modifiedIntention.type === INTENTION_TYPE.FAVOR_GAIN) {
+    const favorGain = Math.floor(modifiedIntention.value * judgeEffects.favorGainModifier);
+    nextState.opponent = {
+      ...nextState.opponent,
+      favor: Math.min(100, nextState.opponent.favor + favorGain),
+    };
+  } else if (modifiedIntention.type === INTENTION_TYPE.FAVOR_STEAL) {
     const favorSteal = modifiedIntention.value;
     const previousFavor = nextState.player.favor;
     nextState.player = {
@@ -551,7 +490,6 @@ const executeOpponentAction = (state: GameState, intention: Intention): GameStat
   } else if (modifiedIntention.type === INTENTION_TYPE.STALL) {
     nextState.patience -= modifiedIntention.value;
   } else if (modifiedIntention.type === INTENTION_TYPE.FLUSTERED) {
-    // Flustered does nothing - opponent wastes their action
     combatLogger.logSystemEvent('Opponent Flustered', { effect: modifiedIntention.name });
   }
 
@@ -581,7 +519,9 @@ const getIntentionDescription = (intention: Intention): string => {
   switch (intention.type) {
     case INTENTION_TYPE.ATTACK:
       return `Deals ${intention.value} damage`;
-    case INTENTION_TYPE.FAVOR:
+    case INTENTION_TYPE.FAVOR_GAIN:
+      return `Gains ${intention.value} favor`;
+    case INTENTION_TYPE.FAVOR_STEAL:
       return `Steals ${intention.value} favor`;
     case INTENTION_TYPE.STALL:
       return `Drains ${intention.value} patience`;
@@ -604,17 +544,6 @@ const pickRandomFlustered = (): Intention => {
   return { ...FLUSTERED_EFFECTS[index] };
 };
 
-// Pick a random judge action
-const pickRandomJudgeAction = () => {
-  const index = Math.floor(Math.random() * JUDGE_ACTIONS.length);
-  return JUDGE_ACTIONS[index];
-};
-
-// Legacy function for compatibility - now just checks state
-export const resolveAIAction = (state: GameState): GameState => {
-  // This is now handled by processEndTurn
-  return state;
-};
 
 const checkBalanced = (last: Element | null, current: Element) => {
   const cycle: Element[] = [ELEMENT.WOOD, ELEMENT.FIRE, ELEMENT.EARTH, ELEMENT.METAL, ELEMENT.WATER];

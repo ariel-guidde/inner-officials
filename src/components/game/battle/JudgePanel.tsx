@@ -4,6 +4,7 @@ import { Hourglass, Sparkles, Scale, Gavel, AlertTriangle, Flame, Droplets } fro
 import { JudgeEffects } from '../../../types/game';
 
 interface JudgePanelProps {
+  judgeName: string;
   patience: number;
   maxPatience: number;
   playerFavor: number;
@@ -15,6 +16,7 @@ interface JudgePanelProps {
 }
 
 export default function JudgePanel({
+  judgeName,
   patience,
   maxPatience,
   playerFavor,
@@ -75,7 +77,7 @@ export default function JudgePanel({
       {/* Header */}
       <div className="flex items-center justify-center gap-2 mb-4">
         <Scale className="w-5 h-5 text-amber-500" />
-        <h3 className="text-lg font-medium text-amber-100">The Judgment</h3>
+        <h3 className="text-lg font-medium text-amber-100">{judgeName}'s Judgment</h3>
       </div>
 
       {/* Patience */}

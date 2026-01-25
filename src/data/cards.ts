@@ -1,8 +1,6 @@
-import { Card, GameState, ELEMENT, EFFECT_TRIGGER, TARGET_TYPE, CARD_DESTINATION, SELECTION_MODE, INTENTION_TYPE, BOARD_EFFECT_TYPE } from '../types/game';
-import { addActiveEffect, createFavorGainEffect, createDamageReductionEffect, createHealingEffect, createPoiseGainEffect } from '../lib/effects';
-import { addBoardEffect, addIntentionModifier, addRevealEffect } from '../lib/engine';
+import { Card, GameState, ELEMENT, EFFECT_TRIGGER, TARGET_TYPE, CARD_DESTINATION, SELECTION_MODE } from '../types/game';
+import { addActiveEffect, createFavorGainEffect, createHealingEffect, createPoiseGainEffect, addRevealEffect } from '../lib/combat';
 
-// Helper functions for card effects
 const adjustOpponentFace = (s: GameState, val: number) => ({
   ...s,
   opponent: { ...s.opponent, face: Math.max(0, s.opponent.face + val) }
