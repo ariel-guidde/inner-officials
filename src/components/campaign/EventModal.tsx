@@ -1,11 +1,15 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Crown, Sparkles, BookOpen, Swords, Coins, Shirt, Gem, MessageCircle, Star, AlertTriangle } from 'lucide-react';
-import { CalendarEvent, EventChoice, CampaignResources, BattleBonuses } from '../../types/campaign';
+import { Crown, Sparkles, BookOpen, Swords, Coins, Shirt, Gem, MessageCircle, Star, AlertTriangle, XCircle, Heart } from 'lucide-react';
+import { CalendarEvent, CampaignResources, BattleBonuses, SKIP_EVENT_COST } from '../../types/campaign';
 
 interface EventModalProps {
   event: CalendarEvent | null;
   resources: CampaignResources;
+  face: number;
+  canAffordChoice: (choice: { resourceCost?: Partial<CampaignResources>; faceCost?: number }) => boolean;
+  canSkip: boolean;
   onMakeChoice: (eventId: string, choiceId: string) => void;
+  onSkipEvent: (eventId: string) => void;
   onClose: () => void;
 }
 
@@ -74,30 +78,30 @@ function ResourceIcon({ resource }: { resource: string }) {
   }
 }
 
-function canAffordChoice(choice: EventChoice, resources: CampaignResources): boolean {
-  if (!choice.resourceCost) return true;
-  for (const [key, value] of Object.entries(choice.resourceCost)) {
-    if (value && resources[key as keyof CampaignResources] < value) {
-      return false;
-    }
-  }
-  return true;
-}
-
 function formatBonuses(bonuses: Partial<BattleBonuses>): string[] {
   const result: string[] = [];
-  if (bonuses.startingFavor) result.push(`+${bonuses.startingFavor} Starting Favor`);
-  if (bonuses.opponentShame) result.push(`+${bonuses.opponentShame} Opponent Shame`);
-  if (bonuses.patienceBonus) result.push(`+${bonuses.patienceBonus} Starting Patience`);
-  if (bonuses.extraCards?.length) result.push(`+${bonuses.extraCards.length} Special Cards`);
+  if (bonuses.startingFavor) result.push(`+${bonuses.startingFavor} Favor`);
+  if (bonuses.opponentShame) result.push(`+${bonuses.opponentShame} Shame`);
+  if (bonuses.patienceBonus) result.push(`+${bonuses.patienceBonus} Patience`);
+  if (bonuses.extraCards?.length) result.push(`+${bonuses.extraCards.length} Cards`);
   return result;
 }
 
-export default function EventModal({ event, resources, onMakeChoice, onClose }: EventModalProps) {
+export default function EventModal({
+  event,
+  resources,
+  face,
+  canAffordChoice,
+  canSkip,
+  onMakeChoice,
+  onSkipEvent,
+  onClose,
+}: EventModalProps) {
   if (!event) return null;
 
   const colors = getEventColors(event.type);
   const hasChoices = event.choices && event.choices.length > 0;
+  const canSkipThis = !event.cannotSkip && canSkip;
 
   return (
     <AnimatePresence>
@@ -106,7 +110,6 @@ export default function EventModal({ event, resources, onMakeChoice, onClose }: 
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-        onClick={!hasChoices ? onClose : undefined}
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -118,15 +121,6 @@ export default function EventModal({ event, resources, onMakeChoice, onClose }: 
             max-w-lg w-full p-6 shadow-2xl max-h-[85vh] overflow-y-auto
           `}
         >
-          {!hasChoices && (
-            <button
-              onClick={onClose}
-              className="absolute top-4 right-4 text-stone-500 hover:text-stone-300 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          )}
-
           <div className="text-center mb-4">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-stone-800 mb-3">
               {getEventIcon(event.type)}
@@ -142,11 +136,11 @@ export default function EventModal({ event, resources, onMakeChoice, onClose }: 
           </p>
 
           {/* Choices */}
-          {hasChoices ? (
+          {hasChoices && (
             <div className="space-y-3">
               <h3 className="text-amber-200 font-semibold text-center mb-3">What will you do?</h3>
               {event.choices!.map((choice) => {
-                const affordable = canAffordChoice(choice, resources);
+                const affordable = canAffordChoice(choice);
                 const bonuses = choice.bonusReward ? formatBonuses(choice.bonusReward) : [];
 
                 return (
@@ -194,6 +188,17 @@ export default function EventModal({ event, resources, onMakeChoice, onClose }: 
                         ) : null
                       ))}
 
+                      {/* Face cost */}
+                      {choice.faceCost && (
+                        <span className={`flex items-center gap-1 ${
+                          face >= choice.faceCost ? 'text-stone-400' : 'text-red-400'
+                        }`}>
+                          <Heart className="w-3 h-3 text-red-400" />
+                          -{choice.faceCost} face
+                          {face < choice.faceCost && <AlertTriangle className="w-3 h-3" />}
+                        </span>
+                      )}
+
                       {/* Resource rewards */}
                       {choice.resourceReward && Object.entries(choice.resourceReward).map(([key, value]) => (
                         value ? (
@@ -215,8 +220,56 @@ export default function EventModal({ event, resources, onMakeChoice, onClose }: 
                   </motion.button>
                 );
               })}
+
+              {/* Skip option for non-boss events */}
+              {!event.cannotSkip && (
+                <motion.button
+                  whileHover={canSkipThis ? { scale: 1.02 } : {}}
+                  whileTap={canSkipThis ? { scale: 0.98 } : {}}
+                  onClick={() => canSkipThis && onSkipEvent(event.id)}
+                  disabled={!canSkipThis}
+                  className={`
+                    w-full p-4 rounded-lg border text-left transition-all
+                    ${canSkipThis
+                      ? 'bg-stone-800/50 hover:bg-stone-800 border-stone-700 hover:border-red-500 cursor-pointer'
+                      : 'bg-stone-800/30 border-stone-800 cursor-not-allowed opacity-50'
+                    }
+                  `}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <XCircle className="w-4 h-4 text-red-400" />
+                    <span className="font-medium text-stone-300">Skip This Event</span>
+                  </div>
+                  <p className="text-stone-500 text-sm mb-2">
+                    Decline to attend. You will lose reputation.
+                  </p>
+                  <div className="flex gap-3 text-xs">
+                    {Object.entries(SKIP_EVENT_COST.resources).map(([key, value]) => (
+                      value ? (
+                        <span key={key} className={`flex items-center gap-1 ${
+                          resources[key as keyof CampaignResources] >= value
+                            ? 'text-stone-400'
+                            : 'text-red-400'
+                        }`}>
+                          <ResourceIcon resource={key} />
+                          -{value} {key}
+                        </span>
+                      ) : null
+                    ))}
+                    <span className={`flex items-center gap-1 ${
+                      face >= SKIP_EVENT_COST.face ? 'text-stone-400' : 'text-red-400'
+                    }`}>
+                      <Heart className="w-3 h-3 text-red-400" />
+                      -{SKIP_EVENT_COST.face} face
+                    </span>
+                  </div>
+                </motion.button>
+              )}
             </div>
-          ) : (
+          )}
+
+          {/* Simple continue for events without choices */}
+          {!hasChoices && (
             <button
               onClick={onClose}
               className={`

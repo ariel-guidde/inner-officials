@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
-import { CalendarEvent } from '../../types/campaign';
-import { Crown, Sparkles, BookOpen, Swords, CheckCircle } from 'lucide-react';
+import { CalendarEvent, getTimePeriodLabel, TimePeriod } from '../../types/campaign';
+import { Crown, Sparkles, BookOpen, Swords, CheckCircle, Sunrise, Sun, Sunset, Moon } from 'lucide-react';
 
 interface ChineseCalendarProps {
   currentDay: number;
@@ -22,6 +22,19 @@ function getEventIcon(type: CalendarEvent['type']) {
       return <Swords className="w-3 h-3" />;
     default:
       return null;
+  }
+}
+
+function getPeriodIcon(period: TimePeriod) {
+  switch (period) {
+    case 'early_morning':
+      return <Sunrise className="w-2.5 h-2.5" />;
+    case 'late_morning':
+      return <Sun className="w-2.5 h-2.5" />;
+    case 'evening':
+      return <Sunset className="w-2.5 h-2.5" />;
+    case 'night':
+      return <Moon className="w-2.5 h-2.5" />;
   }
 }
 
@@ -66,7 +79,7 @@ export default function ChineseCalendar({
 }: ChineseCalendarProps) {
   const days = Array.from({ length: maxDay }, (_, i) => i + 1);
 
-  // Create a map of day to events (can have multiple)
+  // Create a map of day to events
   const eventsByDay = new Map<number, CalendarEvent[]>();
   for (const event of events) {
     if (event.day > 0) {
@@ -80,7 +93,7 @@ export default function ChineseCalendar({
 
   return (
     <div className="bg-stone-900/60 backdrop-blur rounded-xl border border-stone-700 p-4">
-      <h3 className="text-amber-200 text-lg font-semibold mb-3 text-center">
+      <h3 className="text-amber-200 text-lg font-semibold mb-2 text-center">
         Lunar Month Calendar
       </h3>
       <p className="text-stone-500 text-xs text-center mb-3">
@@ -92,7 +105,7 @@ export default function ChineseCalendar({
           const isCurrent = day === currentDay;
           const dayEvents = eventsByDay.get(day) || [];
           const hasUnresolvedEvent = dayEvents.some(e => !e.resolved);
-          const primaryEvent = dayEvents[0];
+          const primaryEvent = dayEvents.find(e => !e.resolved) || dayEvents[0];
 
           return (
             <motion.button
@@ -117,16 +130,24 @@ export default function ChineseCalendar({
 
               {/* Event indicators */}
               {dayEvents.length > 0 && (
-                <div className="absolute bottom-0.5 flex gap-0.5">
+                <div className="absolute bottom-0.5 flex gap-0.5 items-center">
                   {dayEvents.slice(0, 2).map((event, i) => (
                     <span
                       key={i}
-                      className={`${getEventColor(event.type, event.resolved)}`}
+                      className={`${getEventColor(event.type, event.resolved)} flex items-center`}
+                      title={`${event.name}${event.timePeriod ? ` (${getTimePeriodLabel(event.timePeriod)})` : ''}`}
                     >
                       {event.resolved ? (
                         <CheckCircle className="w-2.5 h-2.5" />
                       ) : (
-                        getEventIcon(event.type)
+                        <>
+                          {getEventIcon(event.type)}
+                          {event.timePeriod && (
+                            <span className="ml-0.5 opacity-60">
+                              {getPeriodIcon(event.timePeriod)}
+                            </span>
+                          )}
+                        </>
                       )}
                     </span>
                   ))}
@@ -165,7 +186,7 @@ export default function ChineseCalendar({
         </div>
         <div className="flex items-center gap-1">
           <CheckCircle className="w-3 h-3 text-stone-500" />
-          <span>Resolved</span>
+          <span>Done</span>
         </div>
       </div>
     </div>

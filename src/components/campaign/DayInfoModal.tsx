@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Clock, Crown, Sparkles, BookOpen, Swords, CheckCircle } from 'lucide-react';
-import { CalendarEvent, formatHour } from '../../types/campaign';
+import { X, Calendar, Crown, Sparkles, BookOpen, Swords, CheckCircle, Sunrise, Sun, Sunset, Moon } from 'lucide-react';
+import { CalendarEvent, TimePeriod, getTimePeriodLabel } from '../../types/campaign';
 
 interface DayInfoModalProps {
   day: number;
@@ -21,6 +21,19 @@ function getEventIcon(type: CalendarEvent['type']) {
       return <BookOpen className="w-5 h-5 text-purple-400" />;
     case 'battle':
       return <Swords className="w-5 h-5 text-blue-400" />;
+  }
+}
+
+function getPeriodIcon(period: TimePeriod) {
+  switch (period) {
+    case 'early_morning':
+      return <Sunrise className="w-3 h-3" />;
+    case 'late_morning':
+      return <Sun className="w-3 h-3" />;
+    case 'evening':
+      return <Sunset className="w-3 h-3" />;
+    case 'night':
+      return <Moon className="w-3 h-3" />;
   }
 }
 
@@ -110,10 +123,10 @@ export default function DayInfoModal({
                           <CheckCircle className="w-4 h-4 text-green-500" />
                         )}
                       </div>
-                      {event.hour && (
+                      {event.timePeriod && (
                         <div className="text-stone-500 text-xs flex items-center gap-1 mt-0.5">
-                          <Clock className="w-3 h-3" />
-                          {formatHour(event.hour)}
+                          {getPeriodIcon(event.timePeriod)}
+                          {getTimePeriodLabel(event.timePeriod)}
                         </div>
                       )}
                       <p className="text-stone-400 text-sm mt-1">{event.description}</p>

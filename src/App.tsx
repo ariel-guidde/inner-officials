@@ -36,19 +36,24 @@ function App() {
     startNewCampaign,
     performAction,
     makeEventChoice,
+    skipEvent,
+    canSkipEvent,
+    canAffordChoice,
     resolveEvent,
     dismissOutcomeMessage,
     selectDay,
-    skipToNextDay,
+    restUntilDawn,
     isActionAvailable,
     clearPendingBattle,
     recordCampaignBattleResult,
     isCampaignOver,
-    hoursRemainingToday,
+    segmentsRemainingToday,
+    currentPeriod,
+    isNightTime,
   } = useCampaign();
 
-  // Track if there's an active campaign (day > 1 or hour > 5 means started)
-  const hasSavedCampaign = campaign.currentDay > 1 || campaign.currentHour > 5;
+  // Track if there's an active campaign (day > 1 or segment > 0 means started)
+  const hasSavedCampaign = campaign.currentDay > 1 || campaign.currentSegment > 0;
 
   // Battle config based on session state and active deck (with campaign bonuses)
   const battleConfig: BattleConfig = {
@@ -212,12 +217,17 @@ function App() {
           onPerformAction={performAction}
           onMakeEventChoice={makeEventChoice}
           onResolveEvent={resolveEvent}
+          onSkipEvent={skipEvent}
           onDismissMessage={dismissOutcomeMessage}
           onSelectDay={selectDay}
-          onSkipToNextDay={skipToNextDay}
+          onRestUntilDawn={restUntilDawn}
           isActionAvailable={isActionAvailable}
+          canAffordChoice={canAffordChoice}
+          canSkipEvent={canSkipEvent}
           isCampaignOver={isCampaignOver}
-          hoursRemainingToday={hoursRemainingToday}
+          segmentsRemainingToday={segmentsRemainingToday}
+          currentPeriod={currentPeriod}
+          isNightTime={isNightTime}
         />
       );
     default:

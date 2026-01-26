@@ -1,11 +1,11 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Info, Crown, Star, Swords, TrendingUp } from 'lucide-react';
-import { CampaignState, BattleBonuses } from '../../types/campaign';
+import { CampaignState, BattleBonuses, TimePeriod, CampaignResources } from '../../types/campaign';
 import ResourceBar from './ResourceBar';
 import ChineseCalendar from './ChineseCalendar';
 import ActionPanel from './ActionPanel';
 import EventModal from './EventModal';
-import Clock from './Clock';
+import TimeCircle from './TimeCircle';
 import DayInfoModal from './DayInfoModal';
 
 interface CampaignScreenProps {
@@ -14,12 +14,17 @@ interface CampaignScreenProps {
   onPerformAction: (actionId: string) => void;
   onMakeEventChoice: (eventId: string, choiceId: string) => void;
   onResolveEvent: (eventId: string) => void;
+  onSkipEvent: (eventId: string) => void;
   onDismissMessage: () => void;
   onSelectDay: (day: number | null) => void;
-  onSkipToNextDay: () => void;
+  onRestUntilDawn: () => void;
   isActionAvailable: (actionId: string) => boolean;
+  canAffordChoice: (choice: { resourceCost?: Partial<CampaignResources>; faceCost?: number }) => boolean;
+  canSkipEvent: (eventId: string) => boolean;
   isCampaignOver: boolean;
-  hoursRemainingToday: number;
+  segmentsRemainingToday: number;
+  currentPeriod: TimePeriod;
+  isNightTime: boolean;
 }
 
 function formatBonusSummary(bonuses: BattleBonuses): string[] {
@@ -37,12 +42,17 @@ export default function CampaignScreen({
   onPerformAction,
   onMakeEventChoice,
   onResolveEvent,
+  onSkipEvent,
   onDismissMessage,
   onSelectDay,
-  onSkipToNextDay,
+  onRestUntilDawn,
   isActionAvailable,
+  canAffordChoice,
+  canSkipEvent,
   isCampaignOver,
-  hoursRemainingToday,
+  segmentsRemainingToday,
+  currentPeriod,
+  isNightTime,
 }: CampaignScreenProps) {
   const handleEventClose = () => {
     if (campaign.activeEvent && !campaign.activeEvent.choices?.length) {
@@ -69,7 +79,7 @@ export default function CampaignScreen({
             <h1 className="text-xl font-bold text-amber-100">
               Day {campaign.currentDay} of {campaign.maxDay}
             </h1>
-            <ResourceBar resources={campaign.resources} />
+            <ResourceBar resources={campaign.resources} face={campaign.face} maxFace={campaign.maxFace} />
           </div>
         </div>
       </div>
@@ -138,13 +148,16 @@ export default function CampaignScreen({
           </motion.div>
         )}
 
-        {/* Clock */}
+        {/* Time Circle */}
         {!isCampaignOver && (
           <div className="mb-4">
-            <Clock
-              currentHour={campaign.currentHour}
-              hoursRemaining={hoursRemainingToday}
-              onSkipDay={onSkipToNextDay}
+            <TimeCircle
+              currentSegment={campaign.currentSegment}
+              segmentsRemaining={segmentsRemainingToday}
+              currentPeriod={currentPeriod}
+              isNightTime={isNightTime}
+              mustRest={campaign.mustRest}
+              onRestUntilDawn={onRestUntilDawn}
             />
           </div>
         )}
@@ -233,10 +246,12 @@ export default function CampaignScreen({
           <div>
             <ActionPanel
               actions={campaign.availableActions}
-              currentHour={campaign.currentHour}
-              hoursRemaining={hoursRemainingToday}
+              currentSegment={campaign.currentSegment}
+              segmentsRemaining={segmentsRemainingToday}
               isActionAvailable={isActionAvailable}
               onSelectAction={onPerformAction}
+              mustRest={campaign.mustRest}
+              isNightTime={isNightTime}
               disabled={isCampaignOver}
             />
           </div>
@@ -247,7 +262,11 @@ export default function CampaignScreen({
       <EventModal
         event={campaign.activeEvent}
         resources={campaign.resources}
+        face={campaign.face}
+        canAffordChoice={canAffordChoice}
+        canSkip={campaign.activeEvent ? canSkipEvent(campaign.activeEvent.id) : false}
         onMakeChoice={onMakeEventChoice}
+        onSkipEvent={onSkipEvent}
         onClose={handleEventClose}
       />
 

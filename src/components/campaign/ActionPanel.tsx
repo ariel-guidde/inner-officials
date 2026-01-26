@@ -1,13 +1,15 @@
 import { motion } from 'framer-motion';
-import { Clock, ShoppingBag, Users, Building2, Brush, Moon, Wine, Flame, AlertCircle } from 'lucide-react';
-import { DayAction, formatHour } from '../../types/campaign';
+import { Clock, ShoppingBag, Users, Building2, Brush, Moon, Wine, AlertCircle } from 'lucide-react';
+import { DayAction, TimePeriod, getTimePeriodLabel, getTimePeriod } from '../../types/campaign';
 
 interface ActionPanelProps {
   actions: DayAction[];
-  currentHour: number;
-  hoursRemaining: number;
+  currentSegment: number;
+  segmentsRemaining: number;
   isActionAvailable: (actionId: string) => boolean;
   onSelectAction: (actionId: string) => void;
+  mustRest: boolean;
+  isNightTime: boolean;
   disabled?: boolean;
 }
 
@@ -21,45 +23,43 @@ function getActionIcon(actionId: string) {
       return <Building2 className="w-5 h-5" />;
     case 'practice-skills':
       return <Brush className="w-5 h-5" />;
-    case 'rest-quarters':
+    case 'rest':
       return <Moon className="w-5 h-5" />;
     case 'evening-gathering':
       return <Wine className="w-5 h-5" />;
-    case 'night-prayer':
-      return <Flame className="w-5 h-5" />;
     default:
       return <Clock className="w-5 h-5" />;
   }
 }
 
-function getAvailabilityReason(
+function formatPeriods(periods: TimePeriod[]): string {
+  return periods.map(p => getTimePeriodLabel(p)).join(', ');
+}
+
+function getUnavailabilityReason(
   action: DayAction,
-  currentHour: number,
-  hoursRemaining: number
+  currentSegment: number,
+  segmentsRemaining: number,
+  mustRest: boolean,
+  isNightTime: boolean
 ): string | null {
-  if (!action.availableHours) {
-    if (action.timeCost > hoursRemaining) {
-      return 'Not enough time today';
+  if (mustRest && action.id !== 'rest') {
+    return 'Must rest until face restored';
+  }
+
+  if (isNightTime && action.id !== 'rest') {
+    return 'Only rest at night';
+  }
+
+  if (action.segmentCost > segmentsRemaining && action.id !== 'rest') {
+    return `Need ${action.segmentCost} segments`;
+  }
+
+  if (action.availablePeriods && action.availablePeriods.length > 0) {
+    const currentPeriod = getTimePeriod(currentSegment);
+    if (!action.availablePeriods.includes(currentPeriod)) {
+      return `Only: ${formatPeriods(action.availablePeriods)}`;
     }
-    return null;
-  }
-
-  const { start, end } = action.availableHours;
-
-  if (currentHour < start) {
-    return `Available from ${formatHour(start)}`;
-  }
-
-  if (currentHour >= end) {
-    return `Closed after ${formatHour(end)}`;
-  }
-
-  if (currentHour + action.timeCost > end) {
-    return `Need ${action.timeCost}h, closes at ${formatHour(end)}`;
-  }
-
-  if (action.timeCost > hoursRemaining) {
-    return 'Not enough time today';
   }
 
   return null;
@@ -67,16 +67,23 @@ function getAvailabilityReason(
 
 export default function ActionPanel({
   actions,
-  currentHour,
-  hoursRemaining,
+  currentSegment,
+  segmentsRemaining,
   isActionAvailable,
   onSelectAction,
+  mustRest,
+  isNightTime,
   disabled,
 }: ActionPanelProps) {
-  // Sort actions: available first, then by name
+  // Sort actions: available first, then rest, then by name
   const sortedActions = [...actions].sort((a, b) => {
     const aAvailable = isActionAvailable(a.id);
     const bAvailable = isActionAvailable(b.id);
+
+    // Rest action special handling
+    if (a.id === 'rest' && !bAvailable) return -1;
+    if (b.id === 'rest' && !aAvailable) return 1;
+
     if (aAvailable && !bAvailable) return -1;
     if (!aAvailable && bAvailable) return 1;
     return a.name.localeCompare(b.name);
@@ -89,14 +96,38 @@ export default function ActionPanel({
       <div className="flex justify-between items-center mb-3">
         <h3 className="text-amber-200 text-lg font-semibold">Actions</h3>
         <span className="text-stone-400 text-sm">
-          {availableCount} available now
+          {availableCount} available
         </span>
       </div>
+
+      {mustRest && (
+        <div className="mb-3 p-2 bg-red-900/30 border border-red-700/50 rounded-lg">
+          <p className="text-red-300 text-sm flex items-center gap-2">
+            <AlertCircle className="w-4 h-4" />
+            You are exhausted. Only rest is available.
+          </p>
+        </div>
+      )}
+
+      {isNightTime && !mustRest && (
+        <div className="mb-3 p-2 bg-indigo-900/30 border border-indigo-700/50 rounded-lg">
+          <p className="text-indigo-300 text-sm flex items-center gap-2">
+            <Moon className="w-4 h-4" />
+            Night has fallen. Rest until dawn.
+          </p>
+        </div>
+      )}
 
       <div className="space-y-2">
         {sortedActions.map((action, index) => {
           const available = isActionAvailable(action.id);
-          const unavailableReason = getAvailabilityReason(action, currentHour, hoursRemaining);
+          const unavailableReason = getUnavailabilityReason(
+            action,
+            currentSegment,
+            segmentsRemaining,
+            mustRest,
+            isNightTime
+          );
 
           return (
             <motion.button
@@ -126,25 +157,24 @@ export default function ActionPanel({
                   </span>
                   <span className={`text-sm flex items-center gap-1 flex-shrink-0 ${available ? 'text-stone-400' : 'text-stone-600'}`}>
                     <Clock className="w-3 h-3" />
-                    {action.timeCost}h
+                    {action.segmentCost} seg
                   </span>
                 </div>
                 <p className={`text-sm truncate ${available ? 'text-stone-400' : 'text-stone-600'}`}>
                   {action.description}
                 </p>
 
-                {/* Time availability info */}
+                {/* Availability info */}
                 <div className="mt-1 flex flex-wrap gap-2 text-xs">
-                  {action.availableHours && (
+                  {action.availablePeriods && action.availablePeriods.length > 0 && (
                     <span className={available ? 'text-stone-500' : 'text-stone-600'}>
-                      {formatHour(action.availableHours.start)} - {formatHour(action.availableHours.end)}
+                      {formatPeriods(action.availablePeriods)}
                     </span>
                   )}
-                  {!action.availableHours && (
+                  {!action.availablePeriods && action.id !== 'rest' && (
                     <span className="text-stone-500">Any time</span>
                   )}
 
-                  {/* Show reason if unavailable */}
                   {unavailableReason && (
                     <span className="text-orange-400/80 flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" />
@@ -157,14 +187,6 @@ export default function ActionPanel({
           );
         })}
       </div>
-
-      {availableCount === 0 && !disabled && (
-        <div className="mt-4 p-3 bg-stone-800/50 rounded-lg border border-stone-700 text-center">
-          <p className="text-stone-400 text-sm">
-            No actions available at this hour. Rest until dawn to start a new day.
-          </p>
-        </div>
-      )}
     </div>
   );
 }

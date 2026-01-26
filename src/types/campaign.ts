@@ -8,26 +8,46 @@ export interface CampaignResources {
   rumors: number;
 }
 
-// ==================== TIME SYSTEM ====================
-export const TIME_OF_DAY = {
-  EARLY_MORNING: 'early_morning', // 5-7 (Chen hour)
-  MORNING: 'morning',             // 7-11 (Si hour)
-  MIDDAY: 'midday',               // 11-13 (Wu hour)
-  AFTERNOON: 'afternoon',         // 13-17 (Wei/Shen hour)
-  EVENING: 'evening',             // 17-19 (You hour)
-  NIGHT: 'night',                 // 19-23 (Xu/Hai hour)
+// ==================== TIME SEGMENT SYSTEM ====================
+// Day is divided into 8 segments (2 per time period)
+// Night segments are for rest only
+export const TIME_PERIOD = {
+  EARLY_MORNING: 'early_morning',
+  LATE_MORNING: 'late_morning',
+  EVENING: 'evening',
+  NIGHT: 'night',
 } as const;
 
-export type TimeOfDay = typeof TIME_OF_DAY[keyof typeof TIME_OF_DAY];
+export type TimePeriod = typeof TIME_PERIOD[keyof typeof TIME_PERIOD];
 
-export interface TimeSlot {
-  hour: number;
-  period: TimeOfDay;
-  label: string;
+export const SEGMENTS_PER_DAY = 8;
+export const SEGMENTS_PER_PERIOD = 2;
+export const USABLE_SEGMENTS = 6; // Excluding night (2 segments)
+export const NIGHT_START_SEGMENT = 6; // Segments 6-7 are night
+
+// Helper to get period from segment index
+export function getTimePeriod(segment: number): TimePeriod {
+  if (segment < 2) return TIME_PERIOD.EARLY_MORNING;
+  if (segment < 4) return TIME_PERIOD.LATE_MORNING;
+  if (segment < 6) return TIME_PERIOD.EVENING;
+  return TIME_PERIOD.NIGHT;
 }
 
-export const HOURS_PER_DAY = 12; // Usable hours (5am to 11pm, simplified)
-export const STARTING_HOUR = 5; // Day starts at 5am
+export function getTimePeriodLabel(period: TimePeriod): string {
+  const labels: Record<TimePeriod, string> = {
+    [TIME_PERIOD.EARLY_MORNING]: 'Early Morning',
+    [TIME_PERIOD.LATE_MORNING]: 'Late Morning',
+    [TIME_PERIOD.EVENING]: 'Evening',
+    [TIME_PERIOD.NIGHT]: 'Night',
+  };
+  return labels[period];
+}
+
+export function getSegmentLabel(segment: number): string {
+  const period = getTimePeriod(segment);
+  const periodSegment = (segment % 2) + 1;
+  return `${getTimePeriodLabel(period)} ${periodSegment}`;
+}
 
 // ==================== CALENDAR EVENTS ====================
 export const CALENDAR_EVENT_TYPE = {
@@ -45,69 +65,85 @@ export interface EventChoice {
   label: string;
   description: string;
   resourceCost?: Partial<CampaignResources>;
+  faceCost?: number;
   resourceReward?: Partial<CampaignResources>;
   triggersBattle?: boolean;
-  battleOpponentIndex?: number; // Which opponent to fight
-  bonusReward?: Partial<BattleBonuses>; // Bonuses earned for boss battle
+  battleOpponentIndex?: number;
+  bonusReward?: Partial<BattleBonuses>;
+  addsEvent?: CalendarEvent; // This choice adds an event to the calendar
   outcomeMessage: string;
 }
+
+// Skip event choice (auto-generated for non-boss events)
+export const SKIP_EVENT_COST: { resources: Partial<CampaignResources>; face: number } = {
+  resources: { rumors: 1 },
+  face: 5,
+};
 
 export interface CalendarEvent {
   id: string;
   day: number;
-  hour?: number; // Optional specific hour
+  timePeriod?: TimePeriod; // When during the day this event occurs
   name: string;
   description: string;
   type: CalendarEventType;
   resolved: boolean;
-  choices?: EventChoice[]; // Choices available during event
-  selectedChoiceId?: string; // Which choice was made
-  notes?: string[]; // Player notes/knowledge about this event
+  choices?: EventChoice[];
+  selectedChoiceId?: string;
+  notes?: string[];
+  cannotSkip?: boolean; // Boss events cannot be skipped
 }
 
 // ==================== ACTION OUTCOMES ====================
 export interface ActionOutcome {
-  probability: number; // 0-1
+  probability: number;
   resourceChanges: Partial<CampaignResources>;
-  eventTrigger?: string; // event ID to trigger
-  message: string; // "You found a silver hairpin!"
-  bonusReward?: Partial<BattleBonuses>; // Rare bonus for boss battle
+  faceChange?: number; // Can heal or damage face
+  eventTrigger?: string;
+  addsEvent?: Omit<CalendarEvent, 'resolved'>; // Outcome can add event to calendar
+  bonusReward?: Partial<BattleBonuses>;
+  message: string;
 }
 
 export interface DayAction {
   id: string;
   name: string;
   description: string;
-  timeCost: number; // hours it takes
-  availableHours?: { start: number; end: number }; // When action is available (e.g., market 7-17)
-  outcomes: ActionOutcome[]; // weighted random selection
+  segmentCost: number; // 1 or 2 segments
+  availablePeriods?: TimePeriod[]; // When action is available (if not set, any non-night)
+  outcomes: ActionOutcome[];
 }
 
 // ==================== BATTLE BONUSES ====================
-// Bonuses accumulated during campaign that affect the boss battle
 export interface BattleBonuses {
-  startingFavor: number;       // Extra starting favor
-  opponentShame: number;       // Shame applied to opponent at start
-  extraCards: string[];        // Card IDs to add to deck for boss battle
-  patienceBonus: number;       // Extra starting patience
-  // Could add more: special effects, judge modifiers, etc.
+  startingFavor: number;
+  opponentShame: number;
+  extraCards: string[];
+  patienceBonus: number;
 }
 
 // ==================== CAMPAIGN STATE ====================
 export interface CampaignState {
   currentDay: number;
-  currentHour: number;
-  maxDay: number; // 30 for lunar month
+  currentSegment: number; // 0-7 (0-5 usable, 6-7 night)
+  maxDay: number;
+
+  // Player status
+  face: number;
+  maxFace: number;
+  mustRest: boolean; // True when face = 0, must rest to full
+
   resources: CampaignResources;
   calendar: CalendarEvent[];
   availableActions: DayAction[];
   bossEvent: CalendarEvent;
-  bossIntel: string[]; // Info gathered about the boss event
-  battleBonuses: BattleBonuses; // Accumulated bonuses for boss battle
-  lastOutcomeMessage: string | null; // Message from last action
-  activeEvent: CalendarEvent | null; // Currently triggered event
-  selectedDay: number | null; // Day selected for viewing info
-  pendingBattle: { opponentIndex: number; eventId: string } | null; // Battle to start
+  bossIntel: string[];
+  battleBonuses: BattleBonuses;
+
+  lastOutcomeMessage: string | null;
+  activeEvent: CalendarEvent | null;
+  selectedDay: number | null;
+  pendingBattle: { opponentIndex: number; eventId: string } | null;
 }
 
 // ==================== CAMPAIGN SCREEN ====================
@@ -117,32 +153,3 @@ export const CAMPAIGN_SCREEN = {
 } as const;
 
 export type CampaignScreen = typeof CAMPAIGN_SCREEN[keyof typeof CAMPAIGN_SCREEN];
-
-// ==================== TIME HELPERS ====================
-export function getTimeOfDay(hour: number): TimeOfDay {
-  if (hour >= 5 && hour < 7) return TIME_OF_DAY.EARLY_MORNING;
-  if (hour >= 7 && hour < 11) return TIME_OF_DAY.MORNING;
-  if (hour >= 11 && hour < 13) return TIME_OF_DAY.MIDDAY;
-  if (hour >= 13 && hour < 17) return TIME_OF_DAY.AFTERNOON;
-  if (hour >= 17 && hour < 19) return TIME_OF_DAY.EVENING;
-  return TIME_OF_DAY.NIGHT;
-}
-
-export function getTimeLabel(hour: number): string {
-  const period = getTimeOfDay(hour);
-  const labels: Record<TimeOfDay, string> = {
-    [TIME_OF_DAY.EARLY_MORNING]: 'Early Morning',
-    [TIME_OF_DAY.MORNING]: 'Morning',
-    [TIME_OF_DAY.MIDDAY]: 'Midday',
-    [TIME_OF_DAY.AFTERNOON]: 'Afternoon',
-    [TIME_OF_DAY.EVENING]: 'Evening',
-    [TIME_OF_DAY.NIGHT]: 'Night',
-  };
-  return labels[period];
-}
-
-export function formatHour(hour: number): string {
-  if (hour < 12) return `${hour}:00`;
-  if (hour === 12) return '12:00';
-  return `${hour}:00`;
-}
