@@ -157,6 +157,8 @@ export const SCREEN = {
   SETTINGS: 'settings',
   BATTLE: 'battle',
   BATTLE_SUMMARY: 'battle-summary',
+  CAMPAIGN_MENU: 'campaign-menu',
+  CAMPAIGN: 'campaign',
 } as const;
 
 export type Screen = typeof SCREEN[keyof typeof SCREEN];

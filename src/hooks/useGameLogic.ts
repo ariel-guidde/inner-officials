@@ -25,10 +25,21 @@ export interface BattleConfig {
   playerStartingFace?: number;
   opponentIndex?: number;
   deckCardIds?: string[]; // Card IDs from saved deck
+  // Campaign bonuses
+  startingFavor?: number;
+  startingPatience?: number;
+  opponentStartingShame?: number;
 }
 
 function createInitialState(config: BattleConfig = {}): GameState {
-  const { playerStartingFace = DEFAULT_MAX_FACE, opponentIndex = 0, deckCardIds } = config;
+  const {
+    playerStartingFace = DEFAULT_MAX_FACE,
+    opponentIndex = 0,
+    deckCardIds,
+    startingFavor = 0,
+    startingPatience = 0,
+    opponentStartingShame = 0,
+  } = config;
 
   // Build deck from saved card IDs or use default
   // Each card instance gets a unique ID to handle multiple copies
@@ -92,7 +103,7 @@ function createInitialState(config: BattleConfig = {}): GameState {
     player: {
       face: playerStartingFace,
       maxFace: DEFAULT_MAX_FACE,
-      favor: 0,
+      favor: startingFavor,
       poise: 0,
       hand: initialHand,
       deck: initialDeck,
@@ -102,7 +113,7 @@ function createInitialState(config: BattleConfig = {}): GameState {
     },
     opponent: {
       name: opponentTemplate.name,
-      face: opponentTemplate.maxFace,
+      face: Math.max(1, opponentTemplate.maxFace - opponentStartingShame),
       maxFace: opponentTemplate.maxFace,
       favor: 0,
       patienceSpent: 0,
@@ -116,7 +127,7 @@ function createInitialState(config: BattleConfig = {}): GameState {
       patienceThreshold: nextJudgeAction.patienceThreshold,
       patienceSpent: 0,
     },
-    patience: 40,
+    patience: 40 + startingPatience,
     lastElement: null,
     history: [],
     harmonyStreak: 0,

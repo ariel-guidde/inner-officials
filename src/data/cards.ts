@@ -33,7 +33,7 @@ export const DEBATE_DECK: Card[] = [
       isPlayRequirement: true,
       prompt: 'Choose a card to discard',
     },
-    targetedEffect: (s, targets, drawCards) => {
+    targetedEffect: (s, _targets, drawCards) => {
       return drawCards ? drawCards(s, 3) : s;
     },
   },
@@ -87,7 +87,7 @@ export const DEBATE_DECK: Card[] = [
       isPlayRequirement: true,
       prompt: 'Choose a card to burn for Favor',
     },
-    targetedEffect: (s, targets, drawCards) => {
+    targetedEffect: (s, targets, _drawCards) => {
       if (!targets.selectedCards || targets.selectedCards.length === 0) return s;
       const targetCard = targets.selectedCards[0];
       const favorGain = targetCard.patienceCost * 5;

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Screen } from './types/game';
 import MainMenu from './components/menu/MainMenu';
 import DeckView from './components/menu/DeckView';
@@ -6,15 +6,21 @@ import HowToPlay from './components/menu/HowToPlay';
 import Settings from './components/menu/Settings';
 import BattleArena from './components/game/BattleArena';
 import BattleSummary from './components/game/BattleSummary';
+import CampaignMenu from './components/menu/CampaignMenu';
+import CampaignScreen from './components/campaign/CampaignScreen';
 import { useGameLogic, BattleConfig } from './hooks/useGameLogic';
 import { useSession } from './hooks/useSession';
 import { useAudio } from './hooks/useAudio';
 import { usePlayerSave } from './hooks/usePlayerSave';
+import { useCampaign } from './hooks/useCampaign';
 
 const DEFAULT_CAMPAIGN_BATTLES = 3;
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('menu');
+  const [isCampaignBattle, setIsCampaignBattle] = useState(false);
+  const campaignBattleEventRef = useRef<string | null>(null);
+
   const playerSave = usePlayerSave();
   const {
     session,
@@ -24,11 +30,37 @@ function App() {
     advanceToNextBattle,
   } = useSession(DEFAULT_CAMPAIGN_BATTLES);
 
-  // Battle config based on session state and active deck
+  // Campaign state
+  const {
+    campaign,
+    startNewCampaign,
+    performAction,
+    makeEventChoice,
+    resolveEvent,
+    dismissOutcomeMessage,
+    selectDay,
+    skipToNextDay,
+    isActionAvailable,
+    clearPendingBattle,
+    recordCampaignBattleResult,
+    isCampaignOver,
+    hoursRemainingToday,
+  } = useCampaign();
+
+  // Track if there's an active campaign (day > 1 or hour > 5 means started)
+  const hasSavedCampaign = campaign.currentDay > 1 || campaign.currentHour > 5;
+
+  // Battle config based on session state and active deck (with campaign bonuses)
   const battleConfig: BattleConfig = {
     playerStartingFace: session.playerFaceCarryOver,
     opponentIndex: session.currentBattle - 1,
     deckCardIds: playerSave.activeDeck?.cardIds,
+    // Campaign bonuses applied when in campaign battle
+    ...(isCampaignBattle && {
+      startingFavor: campaign.battleBonuses.startingFavor,
+      startingPatience: campaign.battleBonuses.patienceBonus,
+      opponentStartingShame: campaign.battleBonuses.opponentShame,
+    }),
   };
 
   const { state, playCard, endTurn, startNewBattle, getBattleResult, debug, targeting, events } = useGameLogic(battleConfig);
@@ -48,15 +80,47 @@ function App() {
     if (state.isGameOver && currentScreen === 'battle') {
       const result = getBattleResult();
       if (result) {
-        recordBattleResult(result);
-        setCurrentScreen('battle-summary');
+        if (isCampaignBattle && campaignBattleEventRef.current) {
+          // Record campaign battle result
+          recordCampaignBattleResult(result.won, campaignBattleEventRef.current);
+          campaignBattleEventRef.current = null;
+          setIsCampaignBattle(false);
+          setCurrentScreen('campaign');
+        } else {
+          // Regular battle session
+          recordBattleResult(result);
+          setCurrentScreen('battle-summary');
+        }
       }
     }
-  }, [state.isGameOver, currentScreen, getBattleResult, recordBattleResult]);
+  }, [state.isGameOver, currentScreen, getBattleResult, recordBattleResult, isCampaignBattle, recordCampaignBattleResult]);
 
-  const handleNavigate = (screen: 'deck' | 'how-to-play' | 'settings' | 'battle') => {
+  // Handle pending campaign battles
+  useEffect(() => {
+    if (campaign.pendingBattle && currentScreen === 'campaign') {
+      const { opponentIndex, eventId } = campaign.pendingBattle;
+      campaignBattleEventRef.current = eventId;
+      setIsCampaignBattle(true);
+      clearPendingBattle();
+
+      // Start battle with campaign bonuses
+      startSession(1); // Single battle
+      startNewBattle({
+        playerStartingFace: 60,
+        opponentIndex,
+        deckCardIds: playerSave.activeDeck?.cardIds,
+        startingFavor: campaign.battleBonuses.startingFavor,
+        startingPatience: campaign.battleBonuses.patienceBonus,
+        opponentStartingShame: campaign.battleBonuses.opponentShame,
+      });
+      setCurrentScreen('battle');
+    }
+  }, [campaign.pendingBattle, currentScreen, clearPendingBattle, startSession, startNewBattle, playerSave.activeDeck, campaign.battleBonuses]);
+
+  const handleNavigate = (screen: 'deck' | 'how-to-play' | 'settings' | 'battle' | 'campaign-menu') => {
     if (screen === 'battle') {
-      // Start new campaign
+      // Start new battle session (quick battle)
+      setIsCampaignBattle(false);
       startSession(DEFAULT_CAMPAIGN_BATTLES);
       startNewBattle({
         playerStartingFace: 60,
@@ -67,15 +131,32 @@ function App() {
     setCurrentScreen(screen);
   };
 
+  const handleStartNewCampaign = () => {
+    startNewCampaign();
+    setCurrentScreen('campaign');
+  };
+
+  const handleResumeCampaign = () => {
+    setCurrentScreen('campaign');
+  };
+
   const handleBack = () => {
     setCurrentScreen('menu');
   };
 
-  const handleContinueCampaign = useCallback(() => {
+  const handleCampaignMenuBack = () => {
+    setCurrentScreen('menu');
+  };
+
+  const handleCampaignBack = () => {
+    setCurrentScreen('campaign-menu');
+  };
+
+  const handleContinueBattleSession = useCallback(() => {
     advanceToNextBattle();
     startNewBattle({
       playerStartingFace: session.playerFaceCarryOver,
-      opponentIndex: session.currentBattle, // This will be incremented after advanceToNextBattle
+      opponentIndex: session.currentBattle,
       deckCardIds: playerSave.activeDeck?.cardIds,
     });
     setCurrentScreen('battle');
@@ -93,7 +174,7 @@ function App() {
     case 'battle':
       return (
         <BattleArena
-          onBack={handleBack}
+          onBack={isCampaignBattle ? () => setCurrentScreen('campaign') : handleBack}
           session={session}
           state={state}
           playCard={playCard}
@@ -108,11 +189,36 @@ function App() {
         <BattleSummary
           result={lastBattleResult}
           session={session}
-          onContinue={handleContinueCampaign}
+          onContinue={handleContinueBattleSession}
           onReturnToMenu={handleBack}
         />
       ) : (
         <MainMenu onNavigate={handleNavigate} />
+      );
+    case 'campaign-menu':
+      return (
+        <CampaignMenu
+          onBack={handleCampaignMenuBack}
+          onNewCampaign={handleStartNewCampaign}
+          onContinueCampaign={handleResumeCampaign}
+          hasSavedCampaign={hasSavedCampaign}
+        />
+      );
+    case 'campaign':
+      return (
+        <CampaignScreen
+          campaign={campaign}
+          onBack={handleCampaignBack}
+          onPerformAction={performAction}
+          onMakeEventChoice={makeEventChoice}
+          onResolveEvent={resolveEvent}
+          onDismissMessage={dismissOutcomeMessage}
+          onSelectDay={selectDay}
+          onSkipToNextDay={skipToNextDay}
+          isActionAvailable={isActionAvailable}
+          isCampaignOver={isCampaignOver}
+          hoursRemainingToday={hoursRemainingToday}
+        />
       );
     default:
       return <MainMenu onNavigate={handleNavigate} />;

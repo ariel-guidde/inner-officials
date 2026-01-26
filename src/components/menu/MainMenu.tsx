@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion';
-import { BookOpen, Swords, Scroll, Settings } from 'lucide-react';
+import { BookOpen, Swords, Scroll, Settings, Castle } from 'lucide-react';
 
 interface MainMenuProps {
-  onNavigate: (screen: 'deck' | 'how-to-play' | 'settings' | 'battle') => void;
+  onNavigate: (screen: 'deck' | 'how-to-play' | 'settings' | 'battle' | 'campaign-menu') => void;
 }
 
 export default function MainMenu({ onNavigate }: MainMenuProps) {
@@ -64,11 +64,24 @@ export default function MainMenu({ onNavigate }: MainMenuProps) {
             transition={{ delay: 0.5, duration: 0.5 }}
             whileHover={{ scale: 1.05, x: 10 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => onNavigate('battle')}
+            onClick={() => onNavigate('campaign-menu')}
             className="flex items-center gap-4 px-8 py-4 bg-amber-600 border border-amber-500 rounded-2xl hover:bg-amber-500 transition-colors group"
           >
-            <Swords className="w-6 h-6 text-white" />
-            <span className="text-xl font-bold text-white">Battle</span>
+            <Castle className="w-6 h-6 text-white" />
+            <span className="text-xl font-bold text-white">Campaign</span>
+          </motion.button>
+
+          <motion.button
+            initial={{ opacity: 0, x: -50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.6, duration: 0.5 }}
+            whileHover={{ scale: 1.05, x: 10 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => onNavigate('battle')}
+            className="flex items-center gap-4 px-8 py-4 bg-stone-900 border border-stone-800 rounded-2xl hover:border-amber-600 transition-colors group"
+          >
+            <Swords className="w-6 h-6 text-amber-500 group-hover:text-amber-400" />
+            <span className="text-xl text-stone-200 group-hover:text-amber-200">Quick Battle</span>
           </motion.button>
         </div>
       </div>
