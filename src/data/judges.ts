@@ -1,9 +1,10 @@
-import { ELEMENT } from '../types/game';
+import { ELEMENT, TierDefinition } from '../types/game';
 
 export interface JudgeTemplate {
     name: string;
     patienceThreshold: number;
     judgeActions: JudgeAction[];
+    tierStructure: TierDefinition[];
 }
 
 export interface JudgeAction {
@@ -17,6 +18,12 @@ export const JUDGES: JudgeTemplate[] = [
     {
         name: "The Emperor",
         patienceThreshold: 50,
+        tierStructure: [
+            { tierNumber: 0, favorRequired: 25, tierName: "Skeptical" },
+            { tierNumber: 1, favorRequired: 30, tierName: "Listening" },
+            { tierNumber: 2, favorRequired: 35, tierName: "Interested" },
+            { tierNumber: 3, favorRequired: 40, tierName: "Convinced" },
+        ],
         judgeActions: [
             {
                 name: "Growing Impatience",
@@ -63,6 +70,13 @@ export const JUDGES: JudgeTemplate[] = [
     {
         name: "The Scholar",
         patienceThreshold: 50,
+        tierStructure: [
+            { tierNumber: 0, favorRequired: 20, tierName: "Dubious" },
+            { tierNumber: 1, favorRequired: 25, tierName: "Curious" },
+            { tierNumber: 2, favorRequired: 30, tierName: "Intrigued" },
+            { tierNumber: 3, favorRequired: 35, tierName: "Impressed" },
+            { tierNumber: 4, favorRequired: 40, tierName: "Persuaded" },
+        ],
         judgeActions: [
             {
                 name: "Element Tax: Fire",
@@ -114,6 +128,11 @@ export const JUDGES: JudgeTemplate[] = [
     {
         name: "The Merchant",
         patienceThreshold: 50,
+        tierStructure: [
+            { tierNumber: 0, favorRequired: 30, tierName: "Unimpressed" },
+            { tierNumber: 1, favorRequired: 35, tierName: "Considering" },
+            { tierNumber: 2, favorRequired: 40, tierName: "Invested" },
+        ],
         judgeActions: [
             {
                 name: "Favor the Bold",
@@ -150,6 +169,11 @@ export const JUDGES: JudgeTemplate[] = [
     {
         name: "The Warlord",
         patienceThreshold: 50,
+        tierStructure: [
+            { tierNumber: 0, favorRequired: 35, tierName: "Dismissive" },
+            { tierNumber: 1, favorRequired: 45, tierName: "Attentive" },
+            { tierNumber: 2, favorRequired: 55, tierName: "Respected" },
+        ],
         judgeActions: [
             {
                 name: "Harsh Judgment",

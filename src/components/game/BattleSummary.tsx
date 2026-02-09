@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Trophy, Skull, Heart, Sparkles, ArrowRight, Home, Swords } from 'lucide-react';
+import { Trophy, Skull, Heart, ChevronUp, ArrowRight, Home, Swords } from 'lucide-react';
 import { BattleResult } from '../../hooks/useSession';
 import { SessionState } from '../../types/game';
 
@@ -65,10 +65,21 @@ export default function BattleSummary({
           </div>
           <div className="stat-row">
             <div className="stat-row-label">
-              <Sparkles className="w-4 h-4 icon-favor" />
-              <span>Favor Gained</span>
+              <ChevronUp className="w-4 h-4 text-green-400" />
+              <span>Your Tier</span>
             </div>
-            <span className="text-value">{result.favorGained}</span>
+            <span className="text-value text-green-400">
+              {result.playerTier}/{result.maxTier}
+            </span>
+          </div>
+          <div className="stat-row">
+            <div className="stat-row-label">
+              <ChevronUp className="w-4 h-4 text-rose-400" />
+              <span>Opponent Tier</span>
+            </div>
+            <span className="text-value text-rose-400">
+              {result.opponentTier}/{result.maxTier}
+            </span>
           </div>
         </div>
 

@@ -141,8 +141,12 @@
     @apply border-red-500/50 bg-red-500/10 text-red-400;
   }
 
-  .intention-favor {
+  .intention-standing-gain {
     @apply border-purple-500/50 bg-purple-500/10 text-purple-400;
+  }
+
+  .intention-standing-damage {
+    @apply border-orange-500/50 bg-orange-500/10 text-orange-400;
   }
 
   .intention-stall {
@@ -151,6 +155,11 @@
 
   .intention-flustered {
     @apply border-blue-500/50 bg-blue-500/10 text-blue-400;
+  }
+
+  /* Standing icon */
+  .icon-standing {
+    @apply text-purple-500;
   }
 
   /* Overlay/Modal backdrop */

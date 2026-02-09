@@ -3,6 +3,7 @@ import { GameEvent, GameState } from '../types/game';
 
 // Event display duration in milliseconds
 const EVENT_DISPLAY_DURATION = 2100; // 0.3s fade in + 1.5s display + 0.3s fade out
+const EVENT_GAP_DURATION = 200; // Gap between events
 
 export interface EventQueueState {
   currentEvent: GameEvent | null;
@@ -19,6 +20,7 @@ export function useEventQueue(): EventQueueState & EventQueueActions {
   const [currentEvent, setCurrentEvent] = useState<GameEvent | null>(null);
   const [isBlocking, setIsBlocking] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isShowingRef = useRef(false);
 
   // Process events from state and clear them from state
   const processEvents = useCallback((state: GameState): GameState => {
@@ -38,14 +40,18 @@ export function useEventQueue(): EventQueueState & EventQueueActions {
 
   // Display next event from queue
   const showNextEvent = useCallback(() => {
+    if (isShowingRef.current) return;
+
     setEventQueue(prev => {
       if (prev.length === 0) {
         setCurrentEvent(null);
         setIsBlocking(false);
+        isShowingRef.current = false;
         return prev;
       }
 
       const [next, ...rest] = prev;
+      isShowingRef.current = true;
       setCurrentEvent(next);
       setIsBlocking(true);
 
@@ -55,24 +61,24 @@ export function useEventQueue(): EventQueueState & EventQueueActions {
       }
       timerRef.current = setTimeout(() => {
         setCurrentEvent(null);
+        isShowingRef.current = false;
         // Small delay before showing next event
-        setTimeout(() => {
-          if (rest.length > 0) {
-            showNextEvent();
-          } else {
-            setIsBlocking(false);
-          }
-        }, 100);
+        timerRef.current = setTimeout(() => {
+          // The rest of the queue is already set - useEffect will trigger showNextEvent
+        }, EVENT_GAP_DURATION);
       }, EVENT_DISPLAY_DURATION);
 
       return rest;
     });
   }, []);
 
-  // Start showing events when queue gets new items
+  // Start showing events when queue gets new items and nothing is currently showing
   useEffect(() => {
-    if (eventQueue.length > 0 && !currentEvent) {
+    if (eventQueue.length > 0 && !currentEvent && !isShowingRef.current) {
       showNextEvent();
+    }
+    if (eventQueue.length === 0 && !currentEvent) {
+      setIsBlocking(false);
     }
   }, [eventQueue.length, currentEvent, showNextEvent]);
 

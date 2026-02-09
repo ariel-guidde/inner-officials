@@ -42,7 +42,7 @@ class CombatLogger {
     cardName: string,
     element: string,
     costs: { patience: number; face: number },
-    flowType: 'balanced' | 'chaos' | 'neutral',
+    flowType: 'balanced' | 'chaos' | 'dissonant' | 'neutral',
     beforeState: GameState,
     afterState: GameState
   ): CombatLogEntry {
@@ -58,10 +58,12 @@ class CombatLogger {
       },
       {
         playerFace: afterState.player.face - beforeState.player.face,
-        playerFavor: afterState.player.favor - beforeState.player.favor,
+        playerStanding: afterState.player.standing.favorInCurrentTier - beforeState.player.standing.favorInCurrentTier,
+        playerTier: afterState.player.standing.currentTier - beforeState.player.standing.currentTier,
         playerPoise: afterState.player.poise - beforeState.player.poise,
         opponentFace: afterState.opponent.face - beforeState.opponent.face,
-        opponentFavor: afterState.opponent.favor - beforeState.opponent.favor,
+        opponentStanding: afterState.opponent.standing.favorInCurrentTier - beforeState.opponent.standing.favorInCurrentTier,
+        opponentTier: afterState.opponent.standing.currentTier - beforeState.opponent.standing.currentTier,
         patience: afterState.patience - beforeState.patience,
       }
     );
@@ -83,8 +85,11 @@ class CombatLogger {
       },
       {
         playerFace: afterState.player.face - beforeState.player.face,
-        playerFavor: afterState.player.favor - beforeState.player.favor,
+        playerStanding: afterState.player.standing.favorInCurrentTier - beforeState.player.standing.favorInCurrentTier,
+        playerTier: afterState.player.standing.currentTier - beforeState.player.standing.currentTier,
         playerPoise: afterState.player.poise - beforeState.player.poise,
+        opponentStanding: afterState.opponent.standing.favorInCurrentTier - beforeState.opponent.standing.favorInCurrentTier,
+        opponentTier: afterState.opponent.standing.currentTier - beforeState.opponent.standing.currentTier,
         patience: afterState.patience - beforeState.patience,
       }
     );

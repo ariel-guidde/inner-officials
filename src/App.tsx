@@ -1,24 +1,40 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Screen } from './types/game';
+import { Screen, CoreArgument } from './types/game';
 import MainMenu from './components/menu/MainMenu';
 import DeckView from './components/menu/DeckView';
 import HowToPlay from './components/menu/HowToPlay';
 import Settings from './components/menu/Settings';
+import PreBattle from './components/menu/PreBattle';
 import BattleArena from './components/game/BattleArena';
 import BattleSummary from './components/game/BattleSummary';
 import CampaignMenu from './components/menu/CampaignMenu';
 import CampaignScreen from './components/campaign/CampaignScreen';
+import AvatarBuilder from './components/menu/AvatarBuilder';
 import { useGameLogic, BattleConfig } from './hooks/useGameLogic';
 import { useSession } from './hooks/useSession';
 import { useAudio } from './hooks/useAudio';
 import { usePlayerSave } from './hooks/usePlayerSave';
 import { useCampaign } from './hooks/useCampaign';
+import { OPPONENTS } from './data/opponents';
 
 const DEFAULT_CAMPAIGN_BATTLES = 3;
+
+function pickRandomOpponentIndices(): number[] {
+  const count = Math.random() < 0.5 ? 1 : 2;
+  const indices: number[] = [];
+  const available = Array.from({ length: OPPONENTS.length }, (_, i) => i);
+  for (let i = 0; i < count && available.length > 0; i++) {
+    const pick = Math.floor(Math.random() * available.length);
+    indices.push(available[pick]);
+    available.splice(pick, 1);
+  }
+  return indices;
+}
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('menu');
   const [isCampaignBattle, setIsCampaignBattle] = useState(false);
+  const [preBattleOpponentIndices, setPreBattleOpponentIndices] = useState<number[]>([0]);
   const campaignBattleEventRef = useRef<string | null>(null);
 
   const playerSave = usePlayerSave();
@@ -114,7 +130,7 @@ function App() {
         playerStartingFace: 60,
         opponentIndex,
         deckCardIds: playerSave.activeDeck?.cardIds,
-        startingFavor: campaign.battleBonuses.startingFavor,
+        startingStanding: campaign.battleBonuses.startingFavor, // Now starting standing
         startingPatience: campaign.battleBonuses.patienceBonus,
         opponentStartingShame: campaign.battleBonuses.opponentShame,
       });
@@ -122,18 +138,26 @@ function App() {
     }
   }, [campaign.pendingBattle, currentScreen, clearPendingBattle, startSession, startNewBattle, playerSave.activeDeck, campaign.battleBonuses]);
 
-  const handleNavigate = (screen: 'deck' | 'how-to-play' | 'settings' | 'battle' | 'campaign-menu') => {
+  const handleNavigate = (screen: 'deck' | 'how-to-play' | 'settings' | 'battle' | 'campaign-menu' | 'avatar-builder') => {
     if (screen === 'battle') {
-      // Start new battle session (quick battle)
+      // Quick battle: go to pre-battle screen first
       setIsCampaignBattle(false);
-      startSession(DEFAULT_CAMPAIGN_BATTLES);
-      startNewBattle({
-        playerStartingFace: 60,
-        opponentIndex: 0,
-        deckCardIds: playerSave.activeDeck?.cardIds,
-      });
+      setPreBattleOpponentIndices(pickRandomOpponentIndices());
+      setCurrentScreen('pre-battle');
+      return;
     }
     setCurrentScreen(screen);
+  };
+
+  const handleStartBattle = (coreArgument: CoreArgument) => {
+    startSession(DEFAULT_CAMPAIGN_BATTLES);
+    startNewBattle({
+      playerStartingFace: 60,
+      opponentIndices: preBattleOpponentIndices,
+      deckCardIds: playerSave.activeDeck?.cardIds,
+      playerCoreArgument: coreArgument,
+    });
+    setCurrentScreen('battle');
   };
 
   const handleStartNewCampaign = () => {
@@ -176,6 +200,14 @@ function App() {
       return <HowToPlay onBack={handleBack} />;
     case 'settings':
       return <Settings onBack={handleBack} />;
+    case 'pre-battle':
+      return (
+        <PreBattle
+          opponentIndices={preBattleOpponentIndices}
+          onStartBattle={handleStartBattle}
+          onBack={handleBack}
+        />
+      );
     case 'battle':
       return (
         <BattleArena
@@ -209,6 +241,8 @@ function App() {
           hasSavedCampaign={hasSavedCampaign}
         />
       );
+    case 'avatar-builder':
+      return <AvatarBuilder onBack={handleBack} />;
     case 'campaign':
       return (
         <CampaignScreen

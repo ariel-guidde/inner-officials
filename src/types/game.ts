@@ -9,11 +9,62 @@ export const ELEMENT = {
 
 export type Element = typeof ELEMENT[keyof typeof ELEMENT];
 
+// ==================== STANDING/TIER SYSTEM ====================
+export interface TierDefinition {
+  tierNumber: number;      // 0, 1, 2, 3...
+  favorRequired: number;   // Favor needed to complete this tier
+  tierName?: string;       // "Skeptical", "Interested", "Convinced", etc.
+}
+
+export interface Standing {
+  currentTier: number;           // Current tier level (0 = base)
+  favorInCurrentTier: number;    // Progress within current tier
+}
+
+export interface CombatResult {
+  playerTier: number;
+  opponentTier: number;
+  maxTier: number;
+}
+
+// ==================== CORE ARGUMENTS SYSTEM ====================
+export type CoreArgumentTrigger =
+  | 'on_card_play'
+  | 'on_turn_start'
+  | 'on_turn_end'
+  | 'on_standing_gain'
+  | 'on_tier_advance'
+  | 'on_damage_dealt';
+
+export interface CoreArgumentPassiveModifiers {
+  standingGainBonus?: number;          // +X standing on gain
+  standingGainMultiplier?: number;     // x% standing gains
+  opponentStandingDamageBonus?: number; // +X when damaging opponent standing
+  patienceCostReduction?: number;      // -X patience costs
+  elementCostReduction?: Partial<Record<Element, number>>;
+  drawBonus?: number;                  // +X cards per turn
+  startingPoise?: number;              // Start turns with X poise
+}
+
+export interface CoreArgument {
+  id: string;
+  name: string;
+  description: string;
+  element?: Element;
+
+  // Passive modifiers always active
+  passiveModifiers?: CoreArgumentPassiveModifiers;
+
+  // Triggered effects
+  trigger?: CoreArgumentTrigger;
+  // Effect function is defined in the module, not here to avoid circular deps
+}
+
 // ==================== INTENTION TYPE ====================
 export const INTENTION_TYPE = {
   ATTACK: 'attack',
-  FAVOR_GAIN: 'favor_gain',
-  FAVOR_STEAL: 'favor_steal',
+  STANDING_GAIN: 'standing_gain',      // Opponent gains standing with judge
+  STANDING_DAMAGE: 'standing_damage',  // Damages PLAYER's standing
   STALL: 'stall',
   FLUSTERED: 'flustered',
 } as const;
@@ -24,7 +75,6 @@ export interface Intention {
   name: string;
   type: IntentionType;
   value: number;
-  patienceThreshold: number; // Patience spent until this action executes
 }
 
 export type DrawCardsFunction = (state: GameState, count: number) => GameState;
@@ -33,6 +83,7 @@ export type DrawCardsFunction = (state: GameState, count: number) => GameState;
 export const TARGET_TYPE = {
   NONE: 'none',
   HAND_CARD: 'hand_card',
+  OPPONENT: 'opponent',
 } as const;
 
 export type TargetType = typeof TARGET_TYPE[keyof typeof TARGET_TYPE];
@@ -64,56 +115,63 @@ export interface TargetRequirement {
 
 export interface TargetedEffectContext {
   selectedCards?: Card[];
+  targetOpponentId?: string;
 }
 
-// ==================== TIMED EFFECTS SYSTEM ====================
-export const EFFECT_TRIGGER = {
+// ==================== UNIFIED STATUS SYSTEM ====================
+export const STATUS_TRIGGER = {
   TURN_START: 'turn_start',
   TURN_END: 'turn_end',
-  ON_DAMAGE: 'on_damage',
+  ON_DAMAGE_RECEIVED: 'on_damage_received',
+  ON_INTENTION_EXECUTE: 'on_intention_execute',
   PASSIVE: 'passive',
 } as const;
 
-export type EffectTrigger = typeof EFFECT_TRIGGER[keyof typeof EFFECT_TRIGGER];
+export type StatusTrigger = typeof STATUS_TRIGGER[keyof typeof STATUS_TRIGGER];
 
-export interface ActiveEffect {
+export const MODIFIER_STAT = {
+  STANDING_GAIN: 'standing_gain',
+  PATIENCE_COST: 'patience_cost',
+  DAMAGE_RECEIVED: 'damage_received',
+  ELEMENT_COST: 'element_cost',
+  FAVOR_GAIN_MULTIPLIER: 'favor_gain_multiplier',
+  DAMAGE_MODIFIER: 'damage_modifier',
+  END_TURN_COST: 'end_turn_cost',
+  POISE: 'poise',
+  FACE_HEALING: 'face_healing',
+} as const;
+
+export type ModifierStat = typeof MODIFIER_STAT[keyof typeof MODIFIER_STAT];
+
+export const MODIFIER_OP = {
+  ADD: 'add',
+  MULTIPLY: 'multiply',
+  SET: 'set',
+} as const;
+
+export type ModifierOp = typeof MODIFIER_OP[keyof typeof MODIFIER_OP];
+
+export interface StatusModifier {
+  stat: ModifierStat;
+  op: ModifierOp;
+  value: number;
+  element?: Element;
+}
+
+export interface Status {
   id: string;
   name: string;
   description: string;
-  element: Element;
-  trigger: EffectTrigger;
-  remainingTurns: number;        // -1 = permanent until triggers exhausted
-  remainingTriggers?: number;    // for "next N attacks" style
-  apply: (state: GameState) => GameState;
+  owner: 'player' | 'opponent';
+  trigger: StatusTrigger;
+  turnsRemaining: number;        // -1 = permanent
+  triggersRemaining?: number;
+  modifiers: StatusModifier[];
+  apply?: (state: GameState) => GameState;
   isPositive: boolean;
+  tags?: string[];               // 'revealed', 'negate_attack', 'core_argument', 'judge_decree'
 }
 
-// ==================== BOARD EFFECTS SYSTEM ====================
-export const BOARD_EFFECT_TYPE = {
-  ELEMENT_COST_MOD: 'element_cost_mod',
-  NEGATE_NEXT_ATTACK: 'negate_next_attack',
-  REFLECT_ATTACK: 'reflect_attack',
-  RULE_MOD: 'rule_mod',
-} as const;
-
-export type BoardEffectType = typeof BOARD_EFFECT_TYPE[keyof typeof BOARD_EFFECT_TYPE];
-
-export interface BoardEffect {
-  id: string;
-  name: string;
-  effectType: BoardEffectType;
-  element?: Element;
-  value?: number;
-  turnsRemaining?: number;  // undefined = until triggered
-  isHidden?: boolean;
-}
-
-export interface IntentionModifier {
-  id: string;
-  name: string;
-  remainingTriggers: number;
-  modify: (intention: Intention) => Intention;
-}
 
 // ==================== EVENT SYSTEM ====================
 export const GAME_EVENT_TYPE = {
@@ -130,8 +188,16 @@ export interface GameEvent {
   description: string;
   actionType?: IntentionType;
   value?: number;
-  statChanges?: { playerFace?: number; playerFavor?: number; };
+  statChanges?: { playerFace?: number; playerStanding?: number; opponentStanding?: number; };
 }
+
+// ==================== STRUCTURED DESCRIPTION ====================
+export interface DescValue {
+  value: number;
+  noDouble?: boolean; // true for durations that don't double in chaos
+}
+
+export type DescriptionPart = string | DescValue;
 
 // ==================== CARD INTERFACE ====================
 export interface Card {
@@ -140,7 +206,7 @@ export interface Card {
   element: Element;
   patienceCost: number;
   faceCost: number;
-  description: string;
+  description: DescriptionPart[];
   effect: (state: GameState, drawCards?: DrawCardsFunction) => GameState;
   isBad?: boolean; // Bad cards are removed from game when played
   removeAfterPlay?: boolean; // Fire cards that burn out after use
@@ -155,10 +221,12 @@ export const SCREEN = {
   DECK: 'deck',
   HOW_TO_PLAY: 'how-to-play',
   SETTINGS: 'settings',
+  PRE_BATTLE: 'pre-battle',
   BATTLE: 'battle',
   BATTLE_SUMMARY: 'battle-summary',
   CAMPAIGN_MENU: 'campaign-menu',
   CAMPAIGN: 'campaign',
+  AVATAR_BUILDER: 'avatar-builder',
 } as const;
 
 export type Screen = typeof SCREEN[keyof typeof SCREEN];
@@ -186,6 +254,20 @@ export interface SessionState {
   playerFaceCarryOver: number; // Face carried from previous battle
   isSessionOver: boolean;
   sessionWon: boolean | null;
+}
+
+// ==================== OPPONENT INTERFACE ====================
+export interface Opponent {
+  id: string;
+  name: string;
+  face: number;
+  maxFace: number;
+  standing: Standing;
+  currentIntention: Intention | null;
+  nextIntention: Intention | null;
+  coreArgument?: CoreArgument;
+  templateName: string;
+  statuses: Status[];
 }
 
 // ==================== TURN PHASE ====================
@@ -218,10 +300,12 @@ export interface CombatLogEntry {
   details: Record<string, unknown>;
   stateDelta?: {
     playerFace?: number;
-    playerFavor?: number;
+    playerStanding?: number;     // Standing change
+    playerTier?: number;         // Tier change
     playerPoise?: number;
     opponentFace?: number;
-    opponentFavor?: number;
+    opponentStanding?: number;   // Standing change
+    opponentTier?: number;       // Tier change
     patience?: number;
   };
 }
@@ -245,26 +329,28 @@ export interface GameState {
   player: {
     face: number;
     maxFace: number;
-    favor: number;
+    standing: Standing;                  // Player's standing with judge (tier system)
     poise: number;
     hand: Card[];
     deck: Card[];
     discard: Card[];
-    removedFromGame: Card[];             
-    canSeeNextIntention: boolean;        
+    removedFromGame: Card[];
+    coreArgument?: CoreArgument;
   };
+  /** @deprecated Use opponents[] instead */
   opponent: {
     name: string;
     face: number;
     maxFace: number;
-    favor: number;
-    patienceSpent: number;               // Track patience spent for intention triggers
-    currentIntention: Intention | null;  // Visible intention with patience threshold
-    nextIntention: Intention | null;     // Hidden next intention
+    standing: Standing;
+    currentIntention: Intention | null;
+    nextIntention: Intention | null;
+    coreArgument?: CoreArgument;
   };
   judge: {
     name: string;                        // Name of the selected judge
     effects: JudgeEffects;
+    tierStructure: TierDefinition[];     // Tier configuration for this judge
     nextEffect: string | null;           // Description of next judge action
     patienceThreshold: number;           // Patience spent until next judge action
     patienceSpent: number;               // Track patience spent for judge triggers
@@ -283,11 +369,10 @@ export interface GameState {
     requirement: TargetRequirement;
     selectedTargets: Card[];
   };
-  // Active effects system (wood cards)
-  activeEffects: ActiveEffect[];
-  // Board effects system (metal cards)
-  boardEffects: BoardEffect[];
-  intentionModifiers: IntentionModifier[];
+  // Unified status system
+  statuses: Status[];
+  // Multi-opponent support
+  opponents: Opponent[];
   // Event system
   pendingEvents: GameEvent[];
 }

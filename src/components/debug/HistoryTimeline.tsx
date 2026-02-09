@@ -30,7 +30,7 @@ export default function HistoryTimeline({ history }: HistoryTimelineProps) {
             <span className="text-stone-200 flex-1">{entry.label}</span>
             <div className="flex gap-2 text-stone-400">
               <span>F:{entry.state.player.face}</span>
-              <span>Fv:{entry.state.player.favor}</span>
+              <span>T{entry.state.player.standing.currentTier}</span>
               <span>P:{entry.state.patience}</span>
             </div>
           </div>

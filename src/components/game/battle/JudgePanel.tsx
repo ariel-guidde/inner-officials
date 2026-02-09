@@ -1,26 +1,104 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Hourglass, Sparkles, Scale, Gavel, AlertTriangle, Flame, Droplets } from 'lucide-react';
-import { JudgeEffects } from '../../../types/game';
+import { Hourglass, Sparkles, Scale, Gavel, AlertTriangle, Flame, Droplets, ChevronUp } from 'lucide-react';
+import { JudgeEffects, Standing, TierDefinition, Opponent } from '../../../types/game';
+import { getTierProgress } from '../../../lib/combat/modules/standing';
 
 interface JudgePanelProps {
   judgeName: string;
   patience: number;
   maxPatience: number;
-  playerFavor: number;
-  opponentFavor: number;
+  playerStanding: Standing;
+  opponentStanding: Standing;
+  opponents?: Opponent[];
+  tierStructure: TierDefinition[];
   judgeEffects: JudgeEffects;
   nextJudgeAction: string | null;
   patienceThreshold: number;
   patienceSpent: number;
 }
 
+interface StandingDisplayProps {
+  label: string;
+  standing: Standing;
+  tierStructure: TierDefinition[];
+  isPlayer: boolean;
+}
+
+function StandingDisplay({ label, standing, tierStructure, isPlayer }: StandingDisplayProps) {
+  const progress = getTierProgress(standing, tierStructure);
+  const maxTier = tierStructure.length > 0 ? Math.max(...tierStructure.map(t => t.tierNumber)) : 0;
+
+  const tierColor = isPlayer
+    ? progress.currentTier >= maxTier ? 'text-amber-400' : 'text-green-400'
+    : progress.currentTier >= maxTier ? 'text-red-400' : 'text-rose-400';
+
+  const barColor = isPlayer
+    ? progress.currentTier >= maxTier ? 'bg-amber-500' : 'bg-green-500'
+    : progress.currentTier >= maxTier ? 'bg-red-500' : 'bg-rose-500';
+
+  return (
+    <div className="flex-1">
+      <div className="text-xs text-stone-500 mb-1 text-center">{label}</div>
+
+      {/* Tier indicator */}
+      <div className="flex items-center justify-center gap-1 mb-2">
+        <div className={`text-lg font-bold ${tierColor}`}>
+          Tier {progress.currentTier}
+        </div>
+        {progress.isMaxTier && (
+          <span className="text-xs text-amber-400 bg-amber-500/20 px-1 rounded">MAX</span>
+        )}
+      </div>
+
+      {/* Tier name */}
+      <div className={`text-xs text-center mb-2 ${tierColor}`}>
+        {progress.tierName}
+      </div>
+
+      {/* Progress bar within current tier */}
+      {!progress.isMaxTier && (
+        <div className="relative">
+          <div className="h-2 bg-stone-800 rounded-full overflow-hidden border border-stone-700">
+            <motion.div
+              animate={{ width: `${progress.progressPercent}%` }}
+              transition={{ duration: 0.3 }}
+              className={`h-full ${barColor}`}
+            />
+          </div>
+          <div className="text-[10px] text-stone-500 text-center mt-1">
+            {progress.favorInTier}/{progress.favorRequired}
+          </div>
+        </div>
+      )}
+
+      {/* Tier dots */}
+      <div className="flex justify-center gap-1 mt-2">
+        {tierStructure.map((tier) => (
+          <div
+            key={tier.tierNumber}
+            className={`w-2 h-2 rounded-full ${
+              tier.tierNumber < progress.currentTier
+                ? barColor
+                : tier.tierNumber === progress.currentTier
+                  ? `${barColor} animate-pulse`
+                  : 'bg-stone-700'
+            }`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function JudgePanel({
   judgeName,
   patience,
   maxPatience,
-  playerFavor,
-  opponentFavor,
+  playerStanding,
+  opponentStanding,
+  opponents,
+  tierStructure,
   judgeEffects,
   nextJudgeAction,
   patienceThreshold,
@@ -31,8 +109,12 @@ export default function JudgePanel({
   const patiencePercent = (patience / maxPatience) * 100;
   const patienceColor = patiencePercent > 50 ? 'bg-amber-500' : patiencePercent > 25 ? 'bg-orange-500' : 'bg-red-500';
 
-  const favorDiff = playerFavor - opponentFavor;
-  const favorAdvantage = favorDiff > 0 ? 'player' : favorDiff < 0 ? 'opponent' : 'tie';
+  // Determine who is ahead
+  const playerProgress = getTierProgress(playerStanding, tierStructure);
+  const opponentProgress = getTierProgress(opponentStanding, tierStructure);
+  const playerAhead = playerProgress.currentTier > opponentProgress.currentTier ||
+    (playerProgress.currentTier === opponentProgress.currentTier &&
+     playerProgress.favorInTier > opponentProgress.favorInTier);
 
   // Check for active modifiers
   const hasActiveModifiers =
@@ -48,7 +130,7 @@ export default function JudgePanel({
     }
     if (judgeEffects.favorGainModifier !== 1.0) {
       const percent = Math.round((judgeEffects.favorGainModifier - 1) * 100);
-      mods.push(`Favor gains ${percent > 0 ? '+' : ''}${percent}%`);
+      mods.push(`Standing gains ${percent > 0 ? '+' : ''}${percent}%`);
     }
     if (judgeEffects.damageModifier !== 1.0) {
       const percent = Math.round((judgeEffects.damageModifier - 1) * 100);
@@ -98,7 +180,7 @@ export default function JudgePanel({
         </div>
         {patience <= 10 && (
           <div className="text-xs text-orange-400 mt-1 text-center">
-            Judges growing impatient...
+            Judge's patience is running thin...
           </div>
         )}
       </div>
@@ -184,45 +266,45 @@ export default function JudgePanel({
         </div>
       )}
 
-      {/* Favor Comparison */}
+      {/* Standing Comparison - Dual Vector Display */}
       <div>
-        <div className="flex items-center justify-center gap-2 mb-3">
-          <Sparkles className="w-4 h-4 text-purple-500" />
-          <span className="text-sm text-stone-300">Favor Standing</span>
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <ChevronUp className="w-4 h-4 text-purple-500" />
+          <span className="text-sm text-stone-300">Standing with Judge</span>
         </div>
 
-        <div className="flex items-center gap-4">
-          {/* Player favor */}
-          <div className="flex-1 text-right">
-            <div className="text-xs text-stone-500 mb-1">You</div>
-            <div className={`text-2xl font-mono ${favorAdvantage === 'player' ? 'text-green-400' : 'text-stone-300'}`}>
-              {playerFavor}
-            </div>
-          </div>
+        <div className="flex items-start gap-4">
+          {/* Player Standing */}
+          <StandingDisplay
+            label="You"
+            standing={playerStanding}
+            tierStructure={tierStructure}
+            isPlayer={true}
+          />
 
-          {/* VS */}
-          <div className="flex flex-col items-center">
+          {/* VS indicator */}
+          <div className="flex flex-col items-center pt-6">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-              favorAdvantage === 'player' ? 'bg-green-600/30 text-green-400 border border-green-500/50' :
-              favorAdvantage === 'opponent' ? 'bg-red-600/30 text-red-400 border border-red-500/50' :
-              'bg-stone-700 text-stone-400 border border-stone-600'
+              playerAhead
+                ? 'bg-green-600/30 text-green-400 border border-green-500/50'
+                : 'bg-red-600/30 text-red-400 border border-red-500/50'
             }`}>
               vs
             </div>
           </div>
 
-          {/* Opponent favor */}
-          <div className="flex-1 text-left">
-            <div className="text-xs text-stone-500 mb-1">Opponent</div>
-            <div className={`text-2xl font-mono ${favorAdvantage === 'opponent' ? 'text-red-400' : 'text-stone-300'}`}>
-              {opponentFavor}
-            </div>
-          </div>
+          {/* Opponent Standing (shared pool) */}
+          <StandingDisplay
+            label={opponents && opponents.length > 1 ? 'Opponents' : 'Opponent'}
+            standing={opponentStanding}
+            tierStructure={tierStructure}
+            isPlayer={false}
+          />
         </div>
 
         {/* Win condition reminder */}
         <div className="mt-4 text-center text-xs text-stone-500">
-          Reach 100 favor to win instantly
+          Higher tier when patience runs out wins
         </div>
       </div>
     </div>

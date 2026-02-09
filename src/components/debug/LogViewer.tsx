@@ -36,11 +36,17 @@ export default function LogViewer({ onExportJSON, onExportCSV }: LogViewerProps)
     if (delta.playerFace && delta.playerFace !== 0) {
       changes.push(`Face ${delta.playerFace > 0 ? '+' : ''}${delta.playerFace}`);
     }
-    if (delta.playerFavor && delta.playerFavor !== 0) {
-      changes.push(`Favor ${delta.playerFavor > 0 ? '+' : ''}${delta.playerFavor}`);
+    if (delta.playerStanding && delta.playerStanding !== 0) {
+      changes.push(`Standing ${delta.playerStanding > 0 ? '+' : ''}${delta.playerStanding}`);
+    }
+    if (delta.playerTier && delta.playerTier !== 0) {
+      changes.push(`Tier ${delta.playerTier > 0 ? '+' : ''}${delta.playerTier}`);
     }
     if (delta.opponentFace && delta.opponentFace !== 0) {
       changes.push(`Opp.Face ${delta.opponentFace > 0 ? '+' : ''}${delta.opponentFace}`);
+    }
+    if (delta.opponentStanding && delta.opponentStanding !== 0) {
+      changes.push(`Opp.Standing ${delta.opponentStanding > 0 ? '+' : ''}${delta.opponentStanding}`);
     }
     if (delta.patience && delta.patience !== 0) {
       changes.push(`Patience ${delta.patience > 0 ? '+' : ''}${delta.patience}`);

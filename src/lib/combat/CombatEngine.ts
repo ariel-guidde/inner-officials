@@ -1,15 +1,16 @@
-import { GameState, Card } from '../../types/game';
+import { GameState, Card, STATUS_TRIGGER } from '../../types/game';
 import { combatLogger } from '../debug/combatLogger';
-import { OPPONENTS } from '../../data/opponents';
 import { JUDGES } from '../../data/judges';
 import { HARMONY_THRESHOLD, DEFAULT_JUDGE_EFFECTS } from './constants';
-import { processEffects, tickEffects } from './effects';
 import { calculateFlowType } from './modules/harmony';
 import { deductFaceCost, calculateEffectiveCosts } from './modules/costs';
 import { checkVictory } from './modules/victory';
-import { executeOpponentAction, advanceOpponentIntention, applyFlusteredMechanic } from './modules/opponent';
+import { executeAllOpponentActions, applyFlusteredMechanic, syncFromLegacyOpponent } from './modules/opponent';
 import { checkJudgeTrigger } from './modules/judge';
-import { consumeRevealTrigger } from './modules/events';
+import { addStanding, getTotalFavor } from './modules/standing';
+import { processCoreArgumentTrigger } from './modules/coreArguments';
+import { processStatusTrigger, tickStatuses, getModifierMultiplier, getModifierAdditive } from './modules/statuses';
+import { MODIFIER_STAT } from '../../types/game';
 
 type DrawCardsFunction = (state: GameState, count: number) => GameState;
 
@@ -36,44 +37,50 @@ export class CombatEngine {
     const costResult = calculateEffectiveCosts(card, nextState);
 
     nextState.patience -= costResult.effectivePatienceCost;
-    // Use composure (poise) before face for face costs
     nextState = deductFaceCost(nextState, costResult.effectiveFaceCost);
 
-    // 3. Track patience spent for opponent and judge triggers
-    nextState = this.trackPatienceSpent(nextState, costResult.effectivePatienceCost);
+    // 3. Effect Application (with chaos double-execution)
+    const standingBefore = getTotalFavor(nextState.player.standing, nextState.judge.tierStructure);
+    const tierBefore = nextState.player.standing.currentTier;
 
-    // 4. Effect Application
-    nextState = card.effect(nextState, drawCards);
-
-    // 5. Apply favor gain modifier
-    const favorGained = nextState.player.favor - beforeState.player.favor;
-    if (favorGained > 0 && judgeEffects.favorGainModifier !== 1.0) {
-      const modifiedGain = Math.floor(favorGained * judgeEffects.favorGainModifier);
-      nextState.player = {
-        ...nextState.player,
-        favor: Math.min(100, beforeState.player.favor + modifiedGain),
-      };
+    // Execute card effect (twice if chaos)
+    const executionCount = flowResult.isChaos ? 2 : 1;
+    for (let i = 0; i < executionCount; i++) {
+      nextState = card.effect(nextState, drawCards);
     }
 
-    // 6. Chaos Bonus (high reward)
-    if (flowResult.isChaos) {
-      const chaosFavor = Math.floor(10 * judgeEffects.favorGainModifier);
-      const chaosDamage = Math.floor(8 * judgeEffects.damageModifier);
-      nextState.player = {
-        ...nextState.player,
-        favor: Math.min(100, nextState.player.favor + chaosFavor),
-      };
-      nextState.opponent = {
-        ...nextState.opponent,
-        face: nextState.opponent.face - chaosDamage,
-      };
+    // 4. Apply standing gain modifier from judge and core arguments
+    const standingAfter = getTotalFavor(nextState.player.standing, nextState.judge.tierStructure);
+    const baseStandingGained = standingAfter - standingBefore;
+
+    if (baseStandingGained > 0) {
+      const judgeModifier = judgeEffects.favorGainModifier;
+      const statusMultiplier = getModifierMultiplier(nextState, MODIFIER_STAT.FAVOR_GAIN_MULTIPLIER, 'player');
+      const statusBonus = getModifierAdditive(nextState, MODIFIER_STAT.STANDING_GAIN, 'player');
+
+      const totalMultiplier = judgeModifier * statusMultiplier;
+      const modifiedGain = Math.floor(baseStandingGained * totalMultiplier) + statusBonus - baseStandingGained;
+
+      if (modifiedGain > 0) {
+        nextState = addStanding(nextState, 'player', modifiedGain);
+      }
     }
 
-    // 7. Update State
+    // Check for tier advancement trigger
+    const tierAfter = nextState.player.standing.currentTier;
+    if (tierAfter > tierBefore) {
+      nextState = processCoreArgumentTrigger(nextState, 'on_tier_advance');
+    }
+
+    // Process on_card_play trigger
+    nextState = processCoreArgumentTrigger(nextState, 'on_card_play');
+
+    // 5. Update State
     nextState.lastElement = card.element;
     nextState.harmonyStreak = flowResult.newHarmonyStreak;
 
-    // 8. Flustered Mechanic - when opponent face breaks, push flustered to top of intentions
+    // 6. Flustered Mechanic - when opponent face breaks
+    nextState = syncFromLegacyOpponent(nextState);
     nextState = applyFlusteredMechanic(nextState);
 
     const finalState = checkVictory(nextState);
@@ -96,7 +103,7 @@ export class CombatEngine {
   }
 
   /**
-   * Process end of turn - costs patience, resets composure, processes effects
+   * Process end of turn - all opponents act, judge triggers, effects tick
    */
   processEndTurn(state: GameState): GameState {
     let nextState = { ...state };
@@ -108,35 +115,31 @@ export class CombatEngine {
 
     combatLogger.log('system', `End Turn (-${endTurnCost} patience)`, { cost: endTurnCost });
 
-    // 2. Always trigger opponent action when ending turn (as if patience threshold reached)
-    if (nextState.opponent.currentIntention) {
-      nextState = executeOpponentAction(nextState, nextState.opponent.currentIntention);
-      // Move to next intention
-      const template = OPPONENTS.find((o) => o.name === nextState.opponent.name);
-      if (template) {
-        nextState = advanceOpponentIntention(nextState);
-        // Consume a reveal trigger when intention changes
-        nextState = consumeRevealTrigger(nextState);
-      }
-    }
+    // 2. All opponents act in sequence
+    nextState = executeAllOpponentActions(nextState);
 
-    // 3. Track patience spent for judge triggers only (opponent already handled above)
-    // We need to manually track judge patience since trackPatienceSpent also handles opponent
+    // 3. Check judge trigger
     const judgeActions = this.getJudgeActions(nextState);
     if (judgeActions.length > 0) {
       nextState = checkJudgeTrigger(nextState, endTurnCost, judgeActions);
     }
 
-    // 4. Process turn_end effects (e.g., wood cards that give favor at end of turn)
-    nextState = processEffects(nextState, 'turn_end');
+    // 4. Process turn_end statuses
+    nextState = processStatusTrigger(nextState, STATUS_TRIGGER.TURN_END);
 
-    // 5. Tick effect counters and remove expired effects
-    nextState = tickEffects(nextState);
+    // 5. Process core argument turn_end triggers
+    nextState = processCoreArgumentTrigger(nextState, 'on_turn_end');
 
-    // 6. Reset composure (poise) at end of turn
-    nextState.player = {
-      ...nextState.player,
-      poise: 0,
+    // 6. Tick status counters and remove expired
+    nextState = tickStatuses(nextState);
+
+    // 7. Reset composure (poise) at end of turn
+    nextState = {
+      ...nextState,
+      player: {
+        ...nextState.player,
+        poise: 0,
+      },
     };
 
     return checkVictory(nextState);
@@ -148,8 +151,11 @@ export class CombatEngine {
   processStartTurn(state: GameState): GameState {
     let nextState = { ...state };
 
-    // Process turn_start effects (e.g., healing, poise gain)
-    nextState = processEffects(nextState, 'turn_start');
+    // Process turn_start statuses (healing, poise gain, core argument poise)
+    nextState = processStatusTrigger(nextState, STATUS_TRIGGER.TURN_START);
+
+    // Process core argument turn_start triggers
+    nextState = processCoreArgumentTrigger(nextState, 'on_turn_start');
 
     return nextState;
   }
@@ -163,40 +169,6 @@ export class CombatEngine {
     }
     const judgeTemplate = JUDGES.find((j) => j.name === state.judge.name);
     return judgeTemplate?.judgeActions ?? [];
-  }
-
-  /**
-   * Track patience spent and trigger opponent/judge actions when thresholds are reached
-   */
-  private trackPatienceSpent(state: GameState, patienceSpent: number): GameState {
-    let nextState = { ...state };
-
-    // Track for opponent intention
-    const newOpponentPatienceSpent = (nextState.opponent.patienceSpent || 0) + patienceSpent;
-    nextState.opponent = { ...nextState.opponent, patienceSpent: newOpponentPatienceSpent };
-
-    // Check if opponent intention should trigger
-    if (nextState.opponent.currentIntention) {
-      const threshold = nextState.opponent.currentIntention.patienceThreshold;
-      if (newOpponentPatienceSpent >= threshold) {
-        nextState = executeOpponentAction(nextState, nextState.opponent.currentIntention);
-        // Move to next intention
-        const template = OPPONENTS.find((o) => o.name === nextState.opponent.name);
-        if (template) {
-          nextState = advanceOpponentIntention(nextState);
-          // Consume a reveal trigger when intention changes
-          nextState = consumeRevealTrigger(nextState);
-        }
-      }
-    }
-
-    // Track for judge
-    const judgeActions = this.getJudgeActions(nextState);
-    if (judgeActions.length > 0) {
-      nextState = checkJudgeTrigger(nextState, patienceSpent, judgeActions);
-    }
-
-    return nextState;
   }
 }
 

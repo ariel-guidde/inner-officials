@@ -5,6 +5,7 @@ import { Card, SavedDeck, Element, ELEMENT } from '../../types/game';
 import { DEBATE_DECK } from '../../data/cards';
 import { getCardById } from '../../lib/saveService';
 import ElementIcon from '../game/ElementIcon';
+import { renderDescription } from '../../lib/describe';
 import { UsePlayerSaveReturn } from '../../hooks/usePlayerSave';
 
 interface DeckBuilderProps {
@@ -200,7 +201,7 @@ export default function DeckBuilder({ deck, onSave, onCancel, validateDeck }: De
                                     {card.patienceCost}P / {card.faceCost}F
                                   </span>
                                 </div>
-                                <p className="text-xs text-stone-400 italic">{card.description}</p>
+                                <p className="text-xs text-stone-400 italic">{renderDescription(card.description)}</p>
                               </div>
                               <div className="flex items-center gap-2 ml-4">
                                 <span className="text-stone-400 font-mono w-8 text-center">{count}x</span>
@@ -276,7 +277,7 @@ export default function DeckBuilder({ deck, onSave, onCancel, validateDeck }: De
                                 </motion.button>
                               </div>
                             </div>
-                            <p className="text-xs text-stone-400 italic">{card.description}</p>
+                            <p className="text-xs text-stone-400 italic">{renderDescription(card.description)}</p>
                           </motion.div>
                         );
                       })}

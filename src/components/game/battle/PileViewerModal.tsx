@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Element } from '../../../types/game';
 import ElementIcon from '../ElementIcon';
+import { renderDescription } from '../../../lib/describe';
 import { X, Layers, RotateCcw, Flame } from 'lucide-react';
 
 export type PileType = 'deck' | 'discard' | 'removed';
@@ -124,7 +125,7 @@ export default function PileViewerModal({ isOpen, pileType, cards, onClose }: Pi
                         </div>
                         <div className="flex-1" />
                         <p className="text-[9px] text-stone-400 line-clamp-3">
-                          {card.description}
+                          {renderDescription(card.description)}
                         </p>
                       </motion.div>
                     );

@@ -9,13 +9,12 @@ interface BattleLayoutProps {
   opponentPanel: React.ReactNode;
   // Center
   judgePanel: React.ReactNode;
-  // Bottom left
+  // Status bar components
   playerPanel: React.ReactNode;
-  // Bottom center-left (deck info)
   deckDisplay: React.ReactNode;
-  // Bottom center
-  hand: React.ReactNode;
   actionBar: React.ReactNode;
+  // Bottom
+  hand: React.ReactNode;
   // Campaign progress indicator
   campaignProgress?: React.ReactNode;
   // Debug panel
@@ -38,61 +37,58 @@ export default function BattleLayout({
   activeEffectsDisplay,
 }: BattleLayoutProps) {
   return (
-    <div className="relative min-h-screen bg-stone-950 text-stone-100 font-serif overflow-hidden">
+    <div className="relative h-screen bg-stone-950 text-stone-100 font-serif overflow-hidden flex flex-col">
       {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-stone-900/50 to-stone-950" />
+      <div className="absolute inset-0 bg-gradient-to-b from-stone-900/50 to-stone-950 pointer-events-none" />
 
-      {/* Main content */}
-      <div className="relative z-10 min-h-screen p-4">
-        {/* Top Row */}
-        <div className="flex items-start justify-between mb-8">
-          {/* Top Left: Back button + Wuxing */}
-          <div className="flex items-start gap-3">
-            <button
-              onClick={onBack}
-              className="p-2 hover:bg-stone-800 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            {wuxingIndicator}
-          </div>
-
-          {/* Top Center: Campaign Progress */}
-          {campaignProgress && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2">
-              {campaignProgress}
-            </div>
-          )}
-
-          {/* Top Right: Opponent */}
-          <div>{opponentPanel}</div>
+      {/* Top Row */}
+      <div className="relative z-10 flex items-start justify-between p-4 pb-0 shrink-0">
+        {/* Top Left: Back button + Wuxing */}
+        <div className="flex items-start gap-3">
+          <button
+            onClick={onBack}
+            className="p-2 hover:bg-stone-800 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          {wuxingIndicator}
         </div>
 
-        {/* Center: Judge Panel */}
-        <div className="flex justify-center mb-8">
-          {judgePanel}
-        </div>
-
-        {/* Bottom Left: Player Info (fixed position) */}
-        <div className="fixed bottom-4 left-4 z-20">
-          {playerPanel}
-        </div>
-
-        {/* Active Effects Display (below player panel) */}
-        {activeEffectsDisplay && (
-          <div className="fixed bottom-40 left-4 z-20 w-64">
-            {activeEffectsDisplay}
+        {/* Top Center: Campaign Progress */}
+        {campaignProgress && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2">
+            {campaignProgress}
           </div>
         )}
 
-        {/* Bottom: Deck/Discard display (above hand area) */}
-        <div className="fixed bottom-52 left-1/2 -translate-x-1/2 z-20">
-          {deckDisplay}
-        </div>
+        {/* Top Right: Opponent */}
+        <div>{opponentPanel}</div>
+      </div>
 
-        {/* Bottom Right: End Turn (fixed position, above hand area) */}
-        <div className="fixed bottom-52 right-4 z-20">
-          {actionBar}
+      {/* Center: Judge Panel (flex-1 to fill available space) */}
+      <div className="relative z-10 flex-1 flex items-center justify-center px-4 min-h-0">
+        {judgePanel}
+      </div>
+
+      {/* Status Bar: Player Info | Active Effects | Deck | End Turn */}
+      {/* pb-48 creates space for the fixed-position hand below */}
+      <div className="relative z-20 shrink-0 px-4 pb-48">
+        <div className="flex items-center justify-between gap-3">
+          {/* Left: Player info + active effects */}
+          <div className="flex items-center gap-3">
+            {playerPanel}
+            {activeEffectsDisplay}
+          </div>
+
+          {/* Center: Deck info */}
+          <div className="flex-shrink-0">
+            {deckDisplay}
+          </div>
+
+          {/* Right: End turn */}
+          <div className="flex-shrink-0">
+            {actionBar}
+          </div>
         </div>
       </div>
 

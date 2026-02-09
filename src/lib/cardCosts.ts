@@ -1,21 +1,7 @@
-import { Card, GameState, Element, ELEMENT } from '../types/game';
-import { DEFAULT_JUDGE_EFFECTS } from './engine';
-
-const HARMONY_THRESHOLD = 5;
-
-// Check if card follows harmony cycle
-const checkBalanced = (last: Element | null, current: Element): boolean => {
-  const cycle: Element[] = [ELEMENT.WOOD, ELEMENT.FIRE, ELEMENT.EARTH, ELEMENT.METAL, ELEMENT.WATER];
-  if (!last) return false; // First move is NOT in harmony
-  return cycle[(cycle.indexOf(last) + 1) % 5] === current;
-};
-
-// Check if card is chaos (skips one element)
-const checkChaos = (last: Element | null, current: Element): boolean => {
-  const cycle: Element[] = [ELEMENT.WOOD, ELEMENT.FIRE, ELEMENT.EARTH, ELEMENT.METAL, ELEMENT.WATER];
-  if (!last) return false;
-  return cycle[(cycle.indexOf(last) + 2) % 5] === current;
-};
+import { Card, GameState, MODIFIER_STAT } from '../types/game';
+import { DEFAULT_JUDGE_EFFECTS } from './combat/constants';
+import { checkBalanced, checkChaos, checkDissonant } from './combat/modules/harmony';
+import { getModifierAdditive } from './combat/modules/statuses';
 
 export interface EffectiveCosts {
   effectivePatienceCost: number;
@@ -28,40 +14,52 @@ export interface EffectiveCosts {
 }
 
 export interface ChaosModifiers {
-  favorGain: number;
-  damage: number;
   patienceIncrease: number;
   faceIncrease: number;
+  doublesEffect: boolean;
 }
 
 /**
- * Calculate effective costs for a card based on current game state
+ * Calculate effective costs for a card based on current game state (UI preview)
  */
 export function calculateEffectiveCosts(card: Card, state: GameState): EffectiveCosts {
   const judgeEffects = state.judge?.effects ?? DEFAULT_JUDGE_EFFECTS;
   const elementModifier = judgeEffects.elementCostModifier[card.element] ?? 0;
-  
+
   const originalPatienceCost = card.patienceCost;
   const originalFaceCost = card.faceCost;
-  
-  let effectivePatienceCost = card.patienceCost + elementModifier;
+
+  // Apply status-based cost reductions (from core arguments, etc.)
+  const elementCostReduction = getModifierAdditive(state, MODIFIER_STAT.ELEMENT_COST, 'player', card.element);
+  const patienceCostReduction = getModifierAdditive(state, MODIFIER_STAT.PATIENCE_COST, 'player');
+
+  let effectivePatienceCost = card.patienceCost + elementModifier + elementCostReduction + patienceCostReduction;
   let effectiveFaceCost = card.faceCost;
   let isReduced = false;
   let isIncreased = false;
   let modifier = '';
 
-  // Check harmony/chaos
+  // Track if status modifiers reduced the cost
+  if (elementCostReduction < 0 || patienceCostReduction < 0) {
+    isReduced = true;
+  }
+
   const isBalanced = checkBalanced(state.lastElement, card.element);
   const isChaos = checkChaos(state.lastElement, card.element);
-  const isInHarmony = (state.harmonyStreak ?? 0) >= HARMONY_THRESHOLD;
+  const isDissonant = checkDissonant(state.lastElement, card.element);
 
-  if (isBalanced && isInHarmony) {
+  if (isBalanced) {
     effectivePatienceCost = Math.max(0, effectivePatienceCost - 1);
     isReduced = true;
-    modifier = 'Harmony';
+    modifier = 'Balanced';
+  } else if (isDissonant) {
+    effectivePatienceCost += 1;
+    effectiveFaceCost += 1;
+    isIncreased = true;
+    modifier = 'Dissonant';
   } else if (isChaos) {
-    effectivePatienceCost = effectivePatienceCost + 2;
-    effectiveFaceCost = effectiveFaceCost + 5;
+    effectivePatienceCost += 2;
+    effectiveFaceCost += 2;
     isIncreased = true;
     modifier = 'Chaos';
   }
@@ -93,14 +91,9 @@ export function calculateChaosModifiers(card: Card, state: GameState): ChaosModi
   const isChaos = checkChaos(state.lastElement, card.element);
   if (!isChaos) return null;
 
-  const judgeEffects = state.judge?.effects ?? DEFAULT_JUDGE_EFFECTS;
-  const favorGain = Math.floor(10 * judgeEffects.favorGainModifier);
-  const damage = Math.floor(8 * judgeEffects.damageModifier);
-
   return {
-    favorGain,
-    damage,
     patienceIncrease: 2,
-    faceIncrease: 5,
+    faceIncrease: 2,
+    doublesEffect: true,
   };
 }

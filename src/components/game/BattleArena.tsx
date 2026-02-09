@@ -27,6 +27,12 @@ interface TargetingState {
   confirmTargets: () => void;
   cancelTargeting: () => void;
   canConfirm: () => boolean;
+  // Opponent targeting
+  isOpponentTargeting?: boolean;
+  selectableOpponentIds?: string[];
+  targetOpponentId?: string | null;
+  selectOpponent?: (opponentId: string) => void;
+  confirmOpponentTarget?: (opponentId: string) => void;
 }
 
 interface EventsState {
@@ -78,15 +84,14 @@ export default function BattleArena({ onBack, session, state, playCard, endTurn,
         wuxingIndicator={<WuxingIndicator lastElement={state.lastElement} harmonyStreak={state.harmonyStreak ?? 0} />}
         opponentPanel={
           <OpponentInfoPanel
-            name={state.opponent.name}
-            face={state.opponent.face}
-            maxFace={state.opponent.maxFace}
-            favor={state.opponent.favor}
-            patienceSpent={state.opponent.patienceSpent}
-            currentIntention={state.opponent.currentIntention}
-            nextIntention={state.opponent.nextIntention}
-            canSeeNextIntention={state.player.canSeeNextIntention}
+            opponents={state.opponents}
+            tierStructure={state.judge.tierStructure}
             judgeEffects={state.judge.effects}
+            selectableOpponentIds={targeting?.isOpponentTargeting ? targeting.selectableOpponentIds : undefined}
+            selectedOpponentId={targeting?.targetOpponentId ?? undefined}
+            onOpponentClick={targeting?.isOpponentTargeting ? (id: string) => {
+              targeting.confirmOpponentTarget?.(id);
+            } : undefined}
           />
         }
         judgePanel={
@@ -94,8 +99,10 @@ export default function BattleArena({ onBack, session, state, playCard, endTurn,
             judgeName={state.judge.name}
             patience={state.patience}
             maxPatience={40}
-            playerFavor={state.player.favor}
-            opponentFavor={state.opponent.favor}
+            playerStanding={state.player.standing}
+            opponentStanding={state.opponent.standing}
+            opponents={state.opponents}
+            tierStructure={state.judge.tierStructure}
             judgeEffects={state.judge.effects}
             nextJudgeAction={state.judge.nextEffect}
             patienceThreshold={state.judge.patienceThreshold}
@@ -147,14 +154,13 @@ export default function BattleArena({ onBack, session, state, playCard, endTurn,
         }
         activeEffectsDisplay={
           <ActiveEffectsDisplay
-            activeEffects={state.activeEffects}
-            boardEffects={state.boardEffects}
+            statuses={state.statuses}
           />
         }
       />
 
-      {/* Targeting Overlay */}
-      {targeting && (
+      {/* Targeting Overlay (only for hand card targeting, not opponent targeting) */}
+      {targeting && !targeting.isOpponentTargeting && (
         <TargetingOverlay
           isActive={targeting.isTargeting}
           pendingCard={targeting.pendingCard}
@@ -167,6 +173,28 @@ export default function BattleArena({ onBack, session, state, playCard, endTurn,
           onCancel={targeting.cancelTargeting}
           canConfirm={targeting.canConfirm()}
         />
+      )}
+
+      {/* Opponent targeting banner */}
+      {targeting?.isOpponentTargeting && (
+        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40">
+          <div className="bg-red-900/90 border-2 border-red-500/50 rounded-xl px-6 py-3 backdrop-blur-sm shadow-2xl text-center">
+            <div className="text-red-200 font-medium">
+              Choose an opponent to target
+            </div>
+            {targeting.pendingCard && (
+              <div className="text-xs text-red-400 mt-1">
+                Playing: {targeting.pendingCard.name}
+              </div>
+            )}
+            <button
+              onClick={targeting.cancelTargeting}
+              className="mt-2 px-4 py-1 text-xs bg-stone-700 text-stone-200 rounded-full hover:bg-stone-600"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Event Announcement */}

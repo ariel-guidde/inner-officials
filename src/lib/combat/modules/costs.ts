@@ -1,22 +1,22 @@
-import { GameState, Card } from '../../../types/game';
+import { GameState, Card, MODIFIER_STAT } from '../../../types/game';
 import { DEFAULT_JUDGE_EFFECTS } from '../constants';
-import { checkBalanced, checkChaos } from './harmony';
+import { checkBalanced, checkChaos, checkDissonant } from './harmony';
+import { getModifierAdditive } from './statuses';
 
 export interface EffectiveCosts {
   effectivePatienceCost: number;
   effectiveFaceCost: number;
   isReduced: boolean;
   isIncreased: boolean;
-  modifier: string; // Description of what caused the change
+  modifier: string;
   originalPatienceCost: number;
   originalFaceCost: number;
 }
 
 export interface ChaosModifiers {
-  favorGain: number;
-  damage: number;
   patienceIncrease: number;
   faceIncrease: number;
+  doublesEffect: boolean;
 }
 
 /**
@@ -36,36 +36,57 @@ export function deductFaceCost(state: GameState, cost: number): GameState {
 }
 
 /**
- * Calculate effective costs for a card based on current game state
+ * 4-tier harmony cost model:
+ * - Balanced (+1 in cycle): -1 patience
+ * - Neutral (same element or first card): no change
+ * - Dissonant (+3 or +4 in cycle): +1 patience, +1 face
+ * - Chaos (+2 in cycle): +2 patience, +2 face, effect fires twice
  */
-export function calculateEffectiveCosts(card: Card, state: GameState, harmonyThreshold: number = 5): EffectiveCosts {
+export function calculateEffectiveCosts(card: Card, state: GameState): EffectiveCosts {
   const judgeEffects = state.judge?.effects ?? DEFAULT_JUDGE_EFFECTS;
   const elementModifier = judgeEffects.elementCostModifier[card.element] ?? 0;
 
   const originalPatienceCost = card.patienceCost;
   const originalFaceCost = card.faceCost;
 
-  let effectivePatienceCost = card.patienceCost + elementModifier;
+  // Apply status-based cost reductions (from core arguments, etc.)
+  const elementCostReduction = getModifierAdditive(state, MODIFIER_STAT.ELEMENT_COST, 'player', card.element);
+  const patienceCostReduction = getModifierAdditive(state, MODIFIER_STAT.PATIENCE_COST, 'player');
+
+  let effectivePatienceCost = card.patienceCost + elementModifier + elementCostReduction + patienceCostReduction;
   let effectiveFaceCost = card.faceCost;
   let isReduced = false;
   let isIncreased = false;
   let modifier = '';
 
-  // Check harmony/chaos
+  // Track if status modifiers reduced the cost
+  if (elementCostReduction < 0 || patienceCostReduction < 0) {
+    isReduced = true;
+  }
+
   const isBalanced = checkBalanced(state.lastElement, card.element);
   const isChaos = checkChaos(state.lastElement, card.element);
-  const isInHarmony = (state.harmonyStreak ?? 0) >= harmonyThreshold;
+  const isDissonant = checkDissonant(state.lastElement, card.element);
 
-  if (isBalanced && isInHarmony) {
+  if (isBalanced) {
+    // Balanced: -1 patience (always, not just in harmony)
     effectivePatienceCost = Math.max(0, effectivePatienceCost - 1);
     isReduced = true;
-    modifier = 'Harmony';
+    modifier = 'Balanced';
+  } else if (isDissonant) {
+    // Dissonant: +1 patience, +1 face
+    effectivePatienceCost += 1;
+    effectiveFaceCost += 1;
+    isIncreased = true;
+    modifier = 'Dissonant';
   } else if (isChaos) {
-    effectivePatienceCost = effectivePatienceCost + 2;
-    effectiveFaceCost = effectiveFaceCost + 5;
+    // Chaos: +2 patience, +2 face, but effect doubles
+    effectivePatienceCost += 2;
+    effectiveFaceCost += 2;
     isIncreased = true;
     modifier = 'Chaos';
   }
+  // Neutral: no change
 
   // Check for judge tax
   if (elementModifier > 0) {
@@ -88,20 +109,15 @@ export function calculateEffectiveCosts(card: Card, state: GameState, harmonyThr
 }
 
 /**
- * Calculate chaos bonus modifiers
+ * Calculate chaos modifiers for a card play
  */
 export function calculateChaosModifiers(card: Card, state: GameState): ChaosModifiers | null {
   const isChaos = checkChaos(state.lastElement, card.element);
   if (!isChaos) return null;
 
-  const judgeEffects = state.judge?.effects ?? DEFAULT_JUDGE_EFFECTS;
-  const favorGain = Math.floor(10 * judgeEffects.favorGainModifier);
-  const damage = Math.floor(8 * judgeEffects.damageModifier);
-
   return {
-    favorGain,
-    damage,
     patienceIncrease: 2,
-    faceIncrease: 5,
+    faceIncrease: 2,
+    doublesEffect: true,
   };
 }

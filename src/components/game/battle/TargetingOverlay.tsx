@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Element, TargetRequirement } from '../../../types/game';
 import ElementIcon from '../ElementIcon';
+import { renderDescription } from '../../../lib/describe';
 import { X, Check, Target } from 'lucide-react';
 
 interface TargetingOverlayProps {
@@ -84,7 +85,7 @@ export default function TargetingOverlay({
               </span>
             </div>
             <p className="text-[10px] text-stone-400 flex-1 overflow-hidden">
-              {pendingCard.description}
+              {renderDescription(pendingCard.description)}
             </p>
           </div>
         </div>
@@ -128,7 +129,7 @@ export default function TargetingOverlay({
                   </div>
                   <div className="flex-1" />
                   <p className="text-[9px] text-stone-400 line-clamp-2">
-                    {card.description}
+                    {renderDescription(card.description)}
                   </p>
                 </motion.button>
               );

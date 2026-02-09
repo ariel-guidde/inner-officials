@@ -7,7 +7,9 @@ export interface BattleResult {
   won: boolean;
   finalFace: number;
   opponentName: string;
-  favorGained: number;
+  playerTier: number;
+  opponentTier: number;
+  maxTier: number;
 }
 
 export function useSession(totalBattles: number = 3) {

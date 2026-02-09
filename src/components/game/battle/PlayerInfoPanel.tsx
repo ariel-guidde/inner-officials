@@ -12,45 +12,26 @@ export default function PlayerInfoPanel({ face, maxFace, poise }: PlayerInfoPane
   const faceColor = facePercent > 50 ? 'bg-rose-500' : facePercent > 25 ? 'bg-orange-500' : 'bg-red-600';
 
   return (
-    <div className="panel p-4 w-48">
-      <div className="text-label-small mb-3">Your Status</div>
-
+    <div className="flex items-center gap-4 bg-stone-900/60 border border-stone-700 rounded-xl px-4 py-2 backdrop-blur-sm">
       {/* Face */}
-      <div className="mb-3">
-        <div className="stat-row mb-1">
-          <div className="stat-row-label">
-            <Heart className="w-4 h-4 icon-face" />
-            <span>Face</span>
-          </div>
-          <span className="text-sm font-mono text-stone-200">{face}/{maxFace}</span>
-        </div>
-        <div className="progress-bar-lg">
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${facePercent}%` }}
-            className={`h-full ${faceColor} transition-colors`}
-          />
-        </div>
-      </div>
-
-      {/* Poise/Composure */}
-      <div>
-        <div className="stat-row mb-1">
-          <div className="stat-row-label">
-            <Shield className="w-4 h-4 icon-poise" />
-            <span>Composure</span>
-          </div>
-          <span className="text-sm font-mono text-stone-200">{poise}</span>
-        </div>
-        {poise > 0 && (
-          <div className="progress-bar">
+      <div className="flex items-center gap-2">
+        <Heart className="w-4 h-4 icon-face shrink-0" />
+        <div className="w-24">
+          <div className="progress-bar-lg">
             <motion.div
               initial={{ width: 0 }}
-              animate={{ width: `${Math.min(100, poise)}%` }}
-              className="h-full bg-cyan-500"
+              animate={{ width: `${facePercent}%` }}
+              className={`h-full ${faceColor} transition-colors`}
             />
           </div>
-        )}
+        </div>
+        <span className="text-sm font-mono text-stone-200 w-12 text-right">{face}/{maxFace}</span>
+      </div>
+
+      {/* Composure */}
+      <div className="flex items-center gap-2">
+        <Shield className="w-4 h-4 icon-poise shrink-0" />
+        <span className="text-sm font-mono text-stone-200">{poise}</span>
       </div>
     </div>
   );

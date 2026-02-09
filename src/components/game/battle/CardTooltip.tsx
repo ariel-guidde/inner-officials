@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { Card, Element, GameState, ELEMENT } from '../../../types/game';
 import ElementIcon from '../ElementIcon';
 import { calculateEffectiveCosts, calculateChaosModifiers } from '../../../lib/combat';
+import { renderDescription } from '../../../lib/describe';
 
 interface CardTooltipProps {
   card: Card;
@@ -21,6 +22,7 @@ const ELEMENT_COLORS: Record<Element, string> = {
 export default function CardTooltip({ card, canAfford, playabilityReason, gameState }: CardTooltipProps) {
   const effectiveCosts = calculateEffectiveCosts(card, gameState);
   const chaosModifiers = calculateChaosModifiers(card, gameState);
+  const isChaos = !!chaosModifiers;
 
   return (
     <motion.div
@@ -35,15 +37,15 @@ export default function CardTooltip({ card, canAfford, playabilityReason, gameSt
           <h4 className="font-bold text-amber-100">{card.name}</h4>
         </div>
         <div className={`text-xs font-mono px-2 py-1 rounded ${
-          canAfford 
-            ? effectiveCosts.isReduced 
+          canAfford
+            ? effectiveCosts.isReduced
               ? 'bg-green-900/70 text-green-200'
               : effectiveCosts.isIncreased
                 ? 'bg-red-900/70 text-red-200'
                 : 'bg-stone-800 text-stone-200'
             : 'bg-red-900 text-red-300'
         }`}>
-          {effectiveCosts.isReduced && (
+          {(effectiveCosts.isReduced || effectiveCosts.isIncreased) && (
             <span className="line-through text-stone-400 mr-1">
               {effectiveCosts.originalPatienceCost}P{effectiveCosts.originalFaceCost > 0 ? ` / ${effectiveCosts.originalFaceCost}F` : ''}
             </span>
@@ -53,15 +55,22 @@ export default function CardTooltip({ card, canAfford, playabilityReason, gameSt
           </span>
         </div>
       </div>
-      <p className="text-sm text-stone-300 leading-relaxed">{card.description}</p>
-      
-      {/* Show chaos bonus effects */}
+
+      {/* Description - modified for chaos */}
+      {isChaos ? (
+        <div>
+          <p className="text-sm text-stone-500 line-through leading-relaxed">{renderDescription(card.description)}</p>
+          <p className="text-sm text-orange-300 leading-relaxed">{renderDescription(card.description, true)}</p>
+        </div>
+      ) : (
+        <p className="text-sm text-stone-300 leading-relaxed">{renderDescription(card.description)}</p>
+      )}
+
+      {/* Show chaos indicator */}
       {chaosModifiers && (
         <div className="mt-2 pt-2 border-t border-stone-700">
-          <div className="text-xs font-semibold text-red-400 mb-1">Chaos Bonus:</div>
-          <div className="text-xs text-green-300 space-y-0.5">
-            <div>+{chaosModifiers.favorGain} Favor</div>
-            <div>+{chaosModifiers.damage} Shame to opponent</div>
+          <div className="text-xs font-semibold text-orange-400">
+            Chaos - All effects doubled
           </div>
         </div>
       )}

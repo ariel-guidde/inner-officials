@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { GameEvent, GAME_EVENT_TYPE, INTENTION_TYPE } from '../../../types/game';
-import { Gavel, Swords, Heart, Hourglass, Sparkles, BookMinus } from 'lucide-react';
+import { Gavel, Swords, Heart, Hourglass, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface EventAnnouncementProps {
   event: GameEvent | null;
@@ -23,10 +23,10 @@ export default function EventAnnouncement({ event }: EventAnnouncementProps) {
     switch (event.actionType) {
       case INTENTION_TYPE.ATTACK:
         return <Swords className="w-8 h-8 text-red-400" />;
-      case INTENTION_TYPE.FAVOR_GAIN:
-        return <Sparkles className="w-8 h-8 text-purple-400" />;
-      case INTENTION_TYPE.FAVOR_STEAL:
-        return <BookMinus className="w-8 h-8 text-amber-400" />;
+      case INTENTION_TYPE.STANDING_GAIN:
+        return <TrendingUp className="w-8 h-8 text-purple-400" />;
+      case INTENTION_TYPE.STANDING_DAMAGE:
+        return <TrendingDown className="w-8 h-8 text-orange-400" />;
       case INTENTION_TYPE.STALL:
         return <Hourglass className="w-8 h-8 text-orange-400" />;
       default:
@@ -106,15 +106,23 @@ export default function EventAnnouncement({ event }: EventAnnouncementProps) {
                   </span>
                 </div>
               )}
-              {event.statChanges.playerFavor !== undefined && event.statChanges.playerFavor !== 0 && (
+              {event.statChanges.playerStanding !== undefined && event.statChanges.playerStanding !== 0 && (
                 <div className={`flex items-center gap-1 px-3 py-1 rounded-full ${
-                  event.statChanges.playerFavor < 0
+                  event.statChanges.playerStanding < 0
                     ? 'bg-red-900/50 text-red-300'
                     : 'bg-purple-900/50 text-purple-300'
                 }`}>
-                  <Sparkles className="w-4 h-4" />
+                  <TrendingUp className="w-4 h-4" />
                   <span className="font-mono">
-                    {event.statChanges.playerFavor > 0 ? '+' : ''}{event.statChanges.playerFavor}
+                    {event.statChanges.playerStanding > 0 ? '+' : ''}{event.statChanges.playerStanding}
+                  </span>
+                </div>
+              )}
+              {event.statChanges.opponentStanding !== undefined && event.statChanges.opponentStanding !== 0 && (
+                <div className={`flex items-center gap-1 px-3 py-1 rounded-full bg-orange-900/50 text-orange-300`}>
+                  <TrendingUp className="w-4 h-4" />
+                  <span className="font-mono">
+                    Opp: +{event.statChanges.opponentStanding}
                   </span>
                 </div>
               )}

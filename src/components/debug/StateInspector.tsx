@@ -24,7 +24,8 @@ export default function StateInspector({ state, deckInfo }: StateInspectorProps)
         <h4 className="text-green-400 font-bold mb-2">Player</h4>
         <div className="grid grid-cols-2 gap-2">
           <div>Face: {state.player.face}/{state.player.maxFace}</div>
-          <div>Favor: {state.player.favor}/100</div>
+          <div>Tier: {state.player.standing.currentTier}</div>
+          <div>Tier Progress: {state.player.standing.favorInCurrentTier}</div>
           <div>Poise: {state.player.poise}</div>
           <div>Patience: {state.patience}/40</div>
         </div>
@@ -45,8 +46,9 @@ export default function StateInspector({ state, deckInfo }: StateInspectorProps)
         <h4 className="text-red-400 font-bold mb-2">Opponent: {state.opponent.name}</h4>
         <div className="grid grid-cols-2 gap-2">
           <div>Face: {state.opponent.face}/{state.opponent.maxFace}</div>
-          <div>Favor: {state.opponent.favor}/100</div>
-          <div>Patience Spent: {state.opponent.patienceSpent}</div>
+          <div>Tier: {state.opponent.standing.currentTier}</div>
+          <div>Tier Progress: {state.opponent.standing.favorInCurrentTier}</div>
+          <div>Opponents: {state.opponents.length}</div>
           <div>Intent: {state.opponent.currentIntention?.name ?? 'None'}</div>
         </div>
       </div>

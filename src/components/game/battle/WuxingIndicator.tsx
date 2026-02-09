@@ -20,8 +20,26 @@ export default function WuxingIndicator({ lastElement, harmonyStreak }: WuxingIn
     return ELEMENT_ORDER[(currentIndex + 2) % 5];
   };
 
+  const getDissonantElements = (element: Element): Element[] => {
+    const currentIndex = ELEMENT_ORDER.indexOf(element);
+    return [
+      ELEMENT_ORDER[(currentIndex + 3) % 5],
+      ELEMENT_ORDER[(currentIndex + 4) % 5],
+    ];
+  };
+
   const nextElement = lastElement ? getNextElement(lastElement) : null;
   const chaosElement = lastElement ? getChaosElement(lastElement) : null;
+  const dissonantElements = lastElement ? getDissonantElements(lastElement) : [];
+
+  const getNodeStyle = (element: Element) => {
+    if (!lastElement) return { ring: 'ring-stone-600', bg: 'bg-stone-800' };
+    if (lastElement === element) return { ring: 'ring-blue-500 ring-2', bg: 'bg-blue-900/50' };
+    if (nextElement === element) return { ring: 'ring-green-500 ring-2', bg: 'bg-green-900/30' };
+    if (chaosElement === element) return { ring: 'ring-orange-500 ring-2', bg: 'bg-orange-900/30' };
+    if (dissonantElements.includes(element)) return { ring: 'ring-yellow-500 ring-2', bg: 'bg-yellow-900/20' };
+    return { ring: 'ring-stone-600', bg: 'bg-stone-800' };
+  };
 
   return (
     <div className="bg-stone-900/80 border border-stone-700 rounded-xl p-3 backdrop-blur-sm">
@@ -31,7 +49,6 @@ export default function WuxingIndicator({ lastElement, harmonyStreak }: WuxingIn
       <div className="relative w-24 h-24 mx-auto mb-3">
         {/* Connection lines (pentagon) */}
         <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100">
-          {/* Generating cycle (outer pentagon) */}
           <polygon
             points="50,8 92,38 77,88 23,88 8,38"
             fill="none"
@@ -39,7 +56,6 @@ export default function WuxingIndicator({ lastElement, harmonyStreak }: WuxingIn
             strokeWidth="1"
             className="text-stone-700"
           />
-          {/* Arrows showing direction */}
           <path
             d="M50,8 L92,38 L77,88 L23,88 L8,38 Z"
             fill="none"
@@ -56,28 +72,12 @@ export default function WuxingIndicator({ lastElement, harmonyStreak }: WuxingIn
           const radius = 38;
           const x = 50 + radius * Math.cos(angle);
           const y = 50 + radius * Math.sin(angle);
-
-          const isLast = lastElement === element;
-          const isNext = nextElement === element;
-          const isChaos = chaosElement === element;
-
-          let ringColor = 'ring-stone-600';
-          let bgColor = 'bg-stone-800';
-          if (isLast) {
-            ringColor = 'ring-blue-500 ring-2';
-            bgColor = 'bg-blue-900/50';
-          } else if (isNext) {
-            ringColor = 'ring-green-500 ring-2';
-            bgColor = 'bg-green-900/30';
-          } else if (isChaos) {
-            ringColor = 'ring-red-500 ring-2';
-            bgColor = 'bg-red-900/30';
-          }
+          const style = getNodeStyle(element);
 
           return (
             <div
               key={element}
-              className={`absolute w-7 h-7 rounded-full ${bgColor} ${ringColor} ring-1 flex items-center justify-center transition-all`}
+              className={`absolute w-7 h-7 rounded-full ${style.bg} ${style.ring} ring-1 flex items-center justify-center transition-all`}
               style={{
                 left: `${x}%`,
                 top: `${y}%`,
@@ -110,27 +110,26 @@ export default function WuxingIndicator({ lastElement, harmonyStreak }: WuxingIn
       {/* Legend */}
       {lastElement && (
         <div className="space-y-1 text-[10px]">
-          {harmonyStreak >= HARMONY_THRESHOLD ? (
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-green-900/50 ring-1 ring-green-500 flex items-center justify-center">
-                <ElementIcon element={nextElement!} size="xs" />
-              </div>
-              <span className="text-green-400">Harmony Active: -1 Patience</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-green-900/50 ring-1 ring-green-500 flex items-center justify-center">
-                <ElementIcon element={nextElement!} size="xs" />
-              </div>
-              <span className="text-stone-400">Balanced: {harmonyStreak}/{HARMONY_THRESHOLD} → Harmony</span>
-            </div>
-          )}
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-900/50 ring-1 ring-red-500 flex items-center justify-center">
+            <div className="w-3 h-3 rounded-full bg-green-900/50 ring-1 ring-green-500 flex items-center justify-center">
+              <ElementIcon element={nextElement!} size="xs" />
+            </div>
+            <span className="text-green-400">Balanced: -1 Patience</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-orange-900/50 ring-1 ring-orange-500 flex items-center justify-center">
               <ElementIcon element={chaosElement!} size="xs" />
             </div>
-            <span className="text-red-400">Chaos: +Effect, +Cost</span>
+            <span className="text-orange-400">Chaos: 2x Effect, +2 Cost</span>
           </div>
+          {dissonantElements.length > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-yellow-900/30 ring-1 ring-yellow-500 flex items-center justify-center">
+                <ElementIcon element={dissonantElements[0]} size="xs" />
+              </div>
+              <span className="text-yellow-500/70">Dissonant: +1 Cost</span>
+            </div>
+          )}
         </div>
       )}
 
