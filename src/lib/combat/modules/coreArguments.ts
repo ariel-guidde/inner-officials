@@ -87,10 +87,11 @@ export function processCoreArgumentTrigger(
     nextState = applyCoreArgumentEffect(nextState, playerArg, 'player', context);
   }
 
-  // Process opponent's core argument
-  const opponentArg = state.opponent.coreArgument;
-  if (opponentArg?.trigger === trigger) {
-    nextState = applyCoreArgumentEffect(nextState, opponentArg, 'opponent', context);
+  // Process all opponents' core arguments
+  for (const opp of state.opponents) {
+    if (opp.coreArgument?.trigger === trigger) {
+      nextState = applyCoreArgumentEffect(nextState, opp.coreArgument, 'opponent', context);
+    }
   }
 
   return nextState;

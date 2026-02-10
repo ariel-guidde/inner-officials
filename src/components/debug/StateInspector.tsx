@@ -6,6 +6,8 @@ interface StateInspectorProps {
 }
 
 export default function StateInspector({ state, deckInfo }: StateInspectorProps) {
+  const primaryOpponent = state.opponents[0];
+
   return (
     <div className="space-y-4 text-xs font-mono">
       {/* Turn Info */}
@@ -43,13 +45,13 @@ export default function StateInspector({ state, deckInfo }: StateInspectorProps)
 
       {/* Opponent Stats */}
       <div className="bg-stone-800 rounded p-3">
-        <h4 className="text-red-400 font-bold mb-2">Opponent: {state.opponent.name}</h4>
+        <h4 className="text-red-400 font-bold mb-2">Opponent: {primaryOpponent?.name ?? 'None'}</h4>
         <div className="grid grid-cols-2 gap-2">
-          <div>Face: {state.opponent.face}/{state.opponent.maxFace}</div>
-          <div>Tier: {state.opponent.standing.currentTier}</div>
-          <div>Tier Progress: {state.opponent.standing.favorInCurrentTier}</div>
+          <div>Face: {primaryOpponent?.face ?? 0}/{primaryOpponent?.maxFace ?? 0}</div>
+          <div>Tier: {primaryOpponent?.standing.currentTier ?? 0}</div>
+          <div>Tier Progress: {primaryOpponent?.standing.favorInCurrentTier ?? 0}</div>
           <div>Opponents: {state.opponents.length}</div>
-          <div>Intent: {state.opponent.currentIntention?.name ?? 'None'}</div>
+          <div>Intent: {primaryOpponent?.currentIntention?.name ?? 'None'}</div>
         </div>
       </div>
     </div>

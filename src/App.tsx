@@ -85,16 +85,20 @@ function App() {
   };
 
   const { state, playCard, endTurn, startNewBattle, getBattleResult, debug, targeting, events } = useGameLogic(battleConfig);
-  const { playBattleMusic, stopMusic } = useAudio();
+  const { playBattleMusic, playPlaylist, stopMusic } = useAudio();
 
   // Handle battle music
   useEffect(() => {
     if (currentScreen === 'battle') {
-      playBattleMusic(session.currentBattle);
+      if (state.battleTheme?.musicTracks) {
+        playPlaylist(state.battleTheme.musicTracks);
+      } else {
+        playBattleMusic(session.currentBattle);
+      }
     } else {
       stopMusic();
     }
-  }, [currentScreen, session.currentBattle, playBattleMusic, stopMusic]);
+  }, [currentScreen, session.currentBattle, playBattleMusic, playPlaylist, stopMusic, state.battleTheme?.musicTracks]);
 
   // Watch for battle end to record result
   useEffect(() => {

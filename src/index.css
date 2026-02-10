@@ -183,4 +183,33 @@
   .icon-patience {
     @apply text-amber-500;
   }
+
+  /* Judge theme backgrounds */
+  .bg-emperor-1 {
+    background: linear-gradient(to bottom, rgba(127, 29, 29, 0.4), rgba(120, 53, 15, 0.2), rgba(28, 25, 23, 1));
+  }
+  .bg-emperor-2 {
+    background: linear-gradient(to bottom, rgba(153, 27, 27, 0.3), rgba(146, 64, 14, 0.3), rgba(28, 25, 23, 1));
+  }
+
+  .bg-scholar-1 {
+    background: linear-gradient(to bottom, rgba(30, 58, 138, 0.4), rgba(19, 78, 74, 0.2), rgba(28, 25, 23, 1));
+  }
+  .bg-scholar-2 {
+    background: linear-gradient(to bottom, rgba(21, 94, 117, 0.35), rgba(30, 64, 175, 0.2), rgba(28, 25, 23, 1));
+  }
+
+  .bg-merchant-1 {
+    background: linear-gradient(to bottom, rgba(146, 64, 14, 0.4), rgba(120, 53, 15, 0.2), rgba(28, 25, 23, 1));
+  }
+  .bg-merchant-2 {
+    background: linear-gradient(to bottom, rgba(161, 98, 7, 0.35), rgba(87, 83, 78, 0.2), rgba(28, 25, 23, 1));
+  }
+
+  .bg-warlord-1 {
+    background: linear-gradient(to bottom, rgba(153, 27, 27, 0.5), rgba(64, 64, 64, 0.2), rgba(28, 25, 23, 1));
+  }
+  .bg-warlord-2 {
+    background: linear-gradient(to bottom, rgba(127, 29, 29, 0.4), rgba(88, 28, 28, 0.3), rgba(28, 25, 23, 1));
+  }
 }

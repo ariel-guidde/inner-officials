@@ -1,6 +1,6 @@
 import { GameState, GAME_EVENT_TYPE } from '../../../types/game';
 import { JudgeAction } from '../../../data/judges';
-import { combatLogger } from '../../debug/combatLogger';
+import { CombatLog, combatLogger } from '../../debug/combatLogger';
 import { emitGameEvent } from './events';
 
 export function pickRandomJudgeAction(judgeActions: JudgeAction[]): JudgeAction {
@@ -8,10 +8,10 @@ export function pickRandomJudgeAction(judgeActions: JudgeAction[]): JudgeAction 
   return judgeActions[index];
 }
 
-export function applyJudgeAction(state: GameState, judgeAction: JudgeAction, judgeActions: JudgeAction[]): GameState {
+export function applyJudgeAction(state: GameState, judgeAction: JudgeAction, judgeActions: JudgeAction[], log: CombatLog = combatLogger): GameState {
   const newEffects = judgeAction.apply(state.judge.effects);
   const newAction = pickRandomJudgeAction(judgeActions);
-  combatLogger.log('judge', `${judgeAction.name}`, { description: judgeAction.description });
+  log.log('judge', `${judgeAction.name}`, { description: judgeAction.description });
 
   const newDecree = {
     name: judgeAction.name,
@@ -40,7 +40,7 @@ export function applyJudgeAction(state: GameState, judgeAction: JudgeAction, jud
   });
 }
 
-export function checkJudgeTrigger(state: GameState, patienceSpent: number, judgeActions: JudgeAction[]): GameState {
+export function checkJudgeTrigger(state: GameState, patienceSpent: number, judgeActions: JudgeAction[], log: CombatLog = combatLogger): GameState {
   let nextState = { ...state };
 
   const newJudgePatienceSpent = (nextState.judge?.patienceSpent || 0) + patienceSpent;
@@ -50,7 +50,7 @@ export function checkJudgeTrigger(state: GameState, patienceSpent: number, judge
     if (nextState.judge.nextEffect && newJudgePatienceSpent >= nextState.judge.patienceThreshold) {
       const judgeAction = judgeActions.find((a) => a.name === nextState.judge.nextEffect);
       if (judgeAction) {
-        nextState = applyJudgeAction(nextState, judgeAction, judgeActions);
+        nextState = applyJudgeAction(nextState, judgeAction, judgeActions, log);
       }
     }
   }

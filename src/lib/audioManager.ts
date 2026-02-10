@@ -12,9 +12,11 @@ class AudioManager {
   private static instance: AudioManager;
   private currentAudio: HTMLAudioElement | null = null;
   private masterVolume: number = 0.7;
-  private musicVolume: number = 1.0;
+  private musicVolume: number = 0.5;
   private isMuted: boolean = false;
   private fadeInterval: ReturnType<typeof setInterval> | null = null;
+  private playlist: string[] = [];
+  private playlistIndex: number = 0;
 
   private constructor() {
     // Load saved settings from localStorage
@@ -58,8 +60,16 @@ class AudioManager {
     }
 
     const audio = new Audio(src);
-    audio.loop = true;
+    audio.loop = this.playlist.length === 0; // Loop only when not in playlist mode
     this.currentAudio = audio;
+
+    // In playlist mode, advance to next track when current ends
+    if (this.playlist.length > 0) {
+      audio.onended = () => {
+        this.playlistIndex = (this.playlistIndex + 1) % this.playlist.length;
+        this.playPlaylistTrack();
+      };
+    }
 
     if (fadeIn) {
       audio.volume = 0;
@@ -175,6 +185,34 @@ class AudioManager {
 
   getIsMuted(): boolean {
     return this.isMuted;
+  }
+
+  async playPlaylist(tracks: string[]): Promise<void> {
+    this.playlist = tracks;
+    this.playlistIndex = 0;
+    if (tracks.length > 0) {
+      await this.playMusic(tracks[0]);
+    }
+  }
+
+  private async playPlaylistTrack(): Promise<void> {
+    const track = this.playlist[this.playlistIndex];
+    if (!track) return;
+
+    // Stop current without fade for seamless transition
+    if (this.currentAudio) {
+      this.clearFadeInterval();
+      this.currentAudio.pause();
+      this.currentAudio = null;
+    }
+
+    await this.playMusic(track, false);
+  }
+
+  stopPlaylist(): void {
+    this.playlist = [];
+    this.playlistIndex = 0;
+    this.stopMusic();
   }
 
   // Play battle music based on battle number

@@ -7,7 +7,9 @@ export {
   calculateChaosModifiers,
   type EffectiveCosts,
   type ChaosModifiers,
-} from './modules/costs';
+} from './engine/costCalculator';
+
+export { resolveEffects } from './engine/effectResolver';
 
 export { checkBalanced, checkChaos, checkDissonant, getElementStep, calculateFlowType, ELEMENT_CYCLE, type FlowType, type FlowResult } from './modules/harmony';
 export { checkVictory, getDetailedCombatResult, calculateCombatRewards, type CombatReward } from './modules/victory';
@@ -21,8 +23,6 @@ export {
   executeAllOpponentActions,
   getOpponent,
   updateOpponent,
-  syncLegacyOpponent,
-  syncFromLegacyOpponent,
 } from './modules/opponent';
 
 export { pickRandomJudgeAction, applyJudgeAction, checkJudgeTrigger } from './modules/judge';
@@ -44,9 +44,14 @@ export {
 
 export { isCardPlayable } from './playability';
 
+// Services
+export * as deckService from './services/deckService';
+export * as targetingService from './services/targetingService';
+
 // Unified status system
 export {
   addStatus,
+  addStatusFromTemplate,
   removeStatus,
   removeStatusByTag,
   hasStatus,

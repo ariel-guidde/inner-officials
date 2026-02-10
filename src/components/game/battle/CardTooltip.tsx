@@ -70,7 +70,7 @@ export default function CardTooltip({ card, canAfford, playabilityReason, gameSt
       {chaosModifiers && (
         <div className="mt-2 pt-2 border-t border-stone-700">
           <div className="text-xs font-semibold text-orange-400">
-            Chaos - All effects doubled
+            Chaos - Effects x1.5
           </div>
         </div>
       )}

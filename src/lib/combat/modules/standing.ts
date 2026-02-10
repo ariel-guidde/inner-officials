@@ -76,6 +76,65 @@ export function getTierProgress(standing: Standing, tierStructure: TierDefinitio
 }
 
 /**
+ * Advance standing through tiers
+ */
+function advanceStanding(standing: Standing, amount: number, tierStructure: TierDefinition[]): Standing {
+  if (amount <= 0) return standing;
+
+  const maxTier = getMaxTier(tierStructure);
+  const result = { ...standing };
+  let remainingAmount = amount;
+
+  while (remainingAmount > 0) {
+    if (result.currentTier >= maxTier) {
+      result.favorInCurrentTier += remainingAmount;
+      break;
+    }
+
+    const currentTierReq = getCurrentTierRequirement(tierStructure, result.currentTier);
+    const neededForAdvance = currentTierReq - result.favorInCurrentTier;
+
+    if (remainingAmount >= neededForAdvance) {
+      result.currentTier += 1;
+      result.favorInCurrentTier = 0;
+      remainingAmount -= neededForAdvance;
+    } else {
+      result.favorInCurrentTier += remainingAmount;
+      remainingAmount = 0;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Reduce standing, potentially dropping tiers
+ */
+function reduceStanding(standing: Standing, amount: number, tierStructure: TierDefinition[]): Standing {
+  if (amount <= 0) return standing;
+
+  const result = { ...standing };
+  let remainingAmount = amount;
+
+  while (remainingAmount > 0) {
+    if (result.favorInCurrentTier >= remainingAmount) {
+      result.favorInCurrentTier -= remainingAmount;
+      remainingAmount = 0;
+    } else if (result.currentTier > 0) {
+      remainingAmount -= result.favorInCurrentTier;
+      result.currentTier -= 1;
+      const prevTierReq = getCurrentTierRequirement(tierStructure, result.currentTier);
+      result.favorInCurrentTier = prevTierReq;
+    } else {
+      result.favorInCurrentTier = 0;
+      break;
+    }
+  }
+
+  return result;
+}
+
+/**
  * Add standing to a target (player or opponent)
  * Auto-advances tiers when requirements are met
  */
@@ -87,42 +146,20 @@ export function addStanding(
   if (amount <= 0) return state;
 
   const tierStructure = state.judge.tierStructure;
-  const maxTier = getMaxTier(tierStructure);
-
-  let standing = target === 'player' ? { ...state.player.standing } : { ...state.opponent.standing };
-  let remainingAmount = amount;
-
-  while (remainingAmount > 0) {
-    // If already at max tier, just accumulate (no more advancement)
-    if (standing.currentTier >= maxTier) {
-      standing.favorInCurrentTier += remainingAmount;
-      break;
-    }
-
-    const currentTierReq = getCurrentTierRequirement(tierStructure, standing.currentTier);
-    const neededForAdvance = currentTierReq - standing.favorInCurrentTier;
-
-    if (remainingAmount >= neededForAdvance) {
-      // Advance to next tier
-      standing.currentTier += 1;
-      standing.favorInCurrentTier = 0;
-      remainingAmount -= neededForAdvance;
-    } else {
-      // Add to current tier
-      standing.favorInCurrentTier += remainingAmount;
-      remainingAmount = 0;
-    }
-  }
 
   if (target === 'player') {
-    return {
-      ...state,
-      player: { ...state.player, standing },
-    };
+    const standing = advanceStanding(state.player.standing, amount, tierStructure);
+    return { ...state, player: { ...state.player, standing } };
   } else {
+    // Apply to all opponents (shared standing pool)
+    const primary = state.opponents[0];
+    if (!primary) return state;
+    const standing = advanceStanding(primary.standing, amount, tierStructure);
     return {
       ...state,
-      opponent: { ...state.opponent, standing },
+      opponents: state.opponents.map((o, i) =>
+        i === 0 ? { ...o, standing } : o
+      ),
     };
   }
 }
@@ -139,36 +176,19 @@ export function removeStanding(
   if (amount <= 0) return state;
 
   const tierStructure = state.judge.tierStructure;
-  let standing = target === 'player' ? { ...state.player.standing } : { ...state.opponent.standing };
-  let remainingAmount = amount;
-
-  while (remainingAmount > 0) {
-    if (standing.favorInCurrentTier >= remainingAmount) {
-      // Can remove from current tier
-      standing.favorInCurrentTier -= remainingAmount;
-      remainingAmount = 0;
-    } else if (standing.currentTier > 0) {
-      // Need to drop a tier
-      remainingAmount -= standing.favorInCurrentTier;
-      standing.currentTier -= 1;
-      const prevTierReq = getCurrentTierRequirement(tierStructure, standing.currentTier);
-      standing.favorInCurrentTier = prevTierReq; // Start at top of previous tier
-    } else {
-      // At tier 0 with 0 favor, can't go lower
-      standing.favorInCurrentTier = 0;
-      break;
-    }
-  }
 
   if (target === 'player') {
-    return {
-      ...state,
-      player: { ...state.player, standing },
-    };
+    const standing = reduceStanding(state.player.standing, amount, tierStructure);
+    return { ...state, player: { ...state.player, standing } };
   } else {
+    const primary = state.opponents[0];
+    if (!primary) return state;
+    const standing = reduceStanding(primary.standing, amount, tierStructure);
     return {
       ...state,
-      opponent: { ...state.opponent, standing },
+      opponents: state.opponents.map((o, i) =>
+        i === 0 ? { ...o, standing } : o
+      ),
     };
   }
 }
@@ -178,10 +198,13 @@ export function removeStanding(
  */
 export function getCombatResult(state: GameState): CombatResult {
   const maxTier = getMaxTier(state.judge.tierStructure);
+  const maxOpponentTier = state.opponents.length > 0
+    ? Math.max(...state.opponents.map(o => o.standing.currentTier))
+    : 0;
 
   return {
     playerTier: state.player.standing.currentTier,
-    opponentTier: state.opponent.standing.currentTier,
+    opponentTier: maxOpponentTier,
     maxTier,
   };
 }

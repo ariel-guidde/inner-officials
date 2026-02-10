@@ -1,22 +1,62 @@
 import { GameState, Status, StatusTrigger, ModifierStat, MODIFIER_OP, Element, STATUS_TRIGGER } from '../../../types/game';
+import { getStatusTemplate } from '../../../data/statusTemplates';
+import { resolveEffects } from '../engine/effectResolver';
 
 // ==================== STATUS MANAGEMENT ====================
 
-let statusIdCounter = 0;
-
-function generateStatusId(): string {
-  return `status_${Date.now()}_${statusIdCounter++}`;
+function generateId(state: GameState, prefix: string): { id: string; state: GameState } {
+  const id = `${prefix}_${state.nextId}`;
+  return { id, state: { ...state, nextId: state.nextId + 1 } };
 }
 
 export function addStatus(state: GameState, status: Omit<Status, 'id'>): GameState {
+  const { id, state: nextState } = generateId(state, 'status');
   const newStatus: Status = {
     ...status,
-    id: generateStatusId(),
+    id,
   };
   return {
-    ...state,
-    statuses: [...state.statuses, newStatus],
+    ...nextState,
+    statuses: [...nextState.statuses, newStatus],
   };
+}
+
+/**
+ * Add a status from a registered template.
+ * Overrides allow customizing duration, owner, etc.
+ */
+export function addStatusFromTemplate(
+  state: GameState,
+  templateId: string,
+  opts?: {
+    owner?: 'player' | 'opponent';
+    duration?: number;
+    triggerCount?: number;
+  }
+): GameState {
+  const template = getStatusTemplate(templateId);
+  if (!template) {
+    console.warn(`Status template not found: ${templateId}`);
+    return state;
+  }
+
+  const owner = opts?.owner ?? 'player';
+  const duration = opts?.duration ?? template.defaultDuration;
+  const triggerCount = opts?.triggerCount ?? template.defaultTriggerCount;
+
+  return addStatus(state, {
+    templateId,
+    name: template.name,
+    description: template.description,
+    owner,
+    trigger: template.trigger,
+    turnsRemaining: duration,
+    triggersRemaining: triggerCount,
+    modifiers: template.modifiers,
+    apply: template.apply,
+    isPositive: template.isPositive,
+    tags: template.tags,
+  });
 }
 
 export function removeStatus(state: GameState, statusId: string): GameState {
@@ -70,8 +110,14 @@ export function processStatusTrigger(state: GameState, trigger: StatusTrigger, o
   const matchingStatuses = getStatusesByTrigger(nextState, trigger, owner);
 
   for (const status of matchingStatuses) {
-    // Apply the status effect if it has an apply function
-    if (status.apply) {
+    // Check for data-driven triggered effects first (from template)
+    if (status.templateId) {
+      const template = getStatusTemplate(status.templateId);
+      if (template?.triggeredEffects) {
+        nextState = resolveEffects(nextState, template.triggeredEffects, { sourceCardId: status.id });
+      }
+    } else if (status.apply) {
+      // Legacy: apply closure
       nextState = status.apply(nextState);
     }
 
@@ -259,8 +305,9 @@ export function addRevealStatus(state: GameState, opponentId: string, count: num
   }
 
   // Add new reveal status to the specific opponent
+  const { id: revealId, state: nextState } = generateId(state, 'reveal');
   const revealStatus: Status = {
-    id: generateStatusId(),
+    id: revealId,
     name: 'Keen Insight',
     description: `Reveal next ${count} intention(s)`,
     owner: 'opponent',
@@ -273,8 +320,8 @@ export function addRevealStatus(state: GameState, opponentId: string, count: num
   };
 
   return {
-    ...state,
-    opponents: state.opponents.map(o =>
+    ...nextState,
+    opponents: nextState.opponents.map(o =>
       o.id === opponentId
         ? { ...o, statuses: [...o.statuses, revealStatus] }
         : o

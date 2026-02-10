@@ -2,7 +2,28 @@ import { CombatLogEntry, GameState } from '../../types/game';
 
 type LogEventCallback = (entry: CombatLogEntry) => void;
 
-class CombatLogger {
+/**
+ * Injectable interface for combat logging.
+ * Engine functions accept an optional CombatLog parameter.
+ */
+export interface CombatLog {
+  setTurn(turn: number): void;
+  log(actor: CombatLogEntry['actor'], action: string, details?: Record<string, unknown>, stateDelta?: CombatLogEntry['stateDelta']): void;
+  logCardPlayed(cardName: string, element: string, costs: { patience: number; face: number }, flowType: 'balanced' | 'chaos' | 'dissonant' | 'neutral', beforeState: GameState, afterState: GameState): void;
+  logAIAction(intentionName: string, intentionType: string, value: number, beforeState: GameState, afterState: GameState): void;
+  logSystemEvent(action: string, details?: Record<string, unknown>): void;
+}
+
+function getOpponentStats(state: GameState) {
+  const opp = state.opponents[0];
+  return {
+    face: opp?.face ?? 0,
+    standingFavor: opp?.standing.favorInCurrentTier ?? 0,
+    standingTier: opp?.standing.currentTier ?? 0,
+  };
+}
+
+class CombatLogger implements CombatLog {
   private entries: CombatLogEntry[] = [];
   private listeners: Set<LogEventCallback> = new Set();
   private currentTurn = 1;
@@ -61,9 +82,9 @@ class CombatLogger {
         playerStanding: afterState.player.standing.favorInCurrentTier - beforeState.player.standing.favorInCurrentTier,
         playerTier: afterState.player.standing.currentTier - beforeState.player.standing.currentTier,
         playerPoise: afterState.player.poise - beforeState.player.poise,
-        opponentFace: afterState.opponent.face - beforeState.opponent.face,
-        opponentStanding: afterState.opponent.standing.favorInCurrentTier - beforeState.opponent.standing.favorInCurrentTier,
-        opponentTier: afterState.opponent.standing.currentTier - beforeState.opponent.standing.currentTier,
+        opponentFace: getOpponentStats(afterState).face - getOpponentStats(beforeState).face,
+        opponentStanding: getOpponentStats(afterState).standingFavor - getOpponentStats(beforeState).standingFavor,
+        opponentTier: getOpponentStats(afterState).standingTier - getOpponentStats(beforeState).standingTier,
         patience: afterState.patience - beforeState.patience,
       }
     );
@@ -88,8 +109,8 @@ class CombatLogger {
         playerStanding: afterState.player.standing.favorInCurrentTier - beforeState.player.standing.favorInCurrentTier,
         playerTier: afterState.player.standing.currentTier - beforeState.player.standing.currentTier,
         playerPoise: afterState.player.poise - beforeState.player.poise,
-        opponentStanding: afterState.opponent.standing.favorInCurrentTier - beforeState.opponent.standing.favorInCurrentTier,
-        opponentTier: afterState.opponent.standing.currentTier - beforeState.opponent.standing.currentTier,
+        opponentStanding: getOpponentStats(afterState).standingFavor - getOpponentStats(beforeState).standingFavor,
+        opponentTier: getOpponentStats(afterState).standingTier - getOpponentStats(beforeState).standingTier,
         patience: afterState.patience - beforeState.patience,
       }
     );
@@ -145,5 +166,5 @@ class CombatLogger {
   }
 }
 
-// Singleton instance
+// Singleton instance (default for backward compat)
 export const combatLogger = new CombatLogger();

@@ -81,6 +81,7 @@ export default function BattleArena({ onBack, session, state, playCard, endTurn,
     <>
       <BattleLayout
         onBack={onBack}
+        backgroundClass={state.battleTheme?.background}
         wuxingIndicator={<WuxingIndicator lastElement={state.lastElement} harmonyStreak={state.harmonyStreak ?? 0} />}
         opponentPanel={
           <OpponentInfoPanel
@@ -100,7 +101,7 @@ export default function BattleArena({ onBack, session, state, playCard, endTurn,
             patience={state.patience}
             maxPatience={40}
             playerStanding={state.player.standing}
-            opponentStanding={state.opponent.standing}
+            opponentStanding={state.opponents[0]?.standing ?? { currentTier: 0, favorInCurrentTier: 0 }}
             opponents={state.opponents}
             tierStructure={state.judge.tierStructure}
             judgeEffects={state.judge.effects}
@@ -154,7 +155,7 @@ export default function BattleArena({ onBack, session, state, playCard, endTurn,
         }
         activeEffectsDisplay={
           <ActiveEffectsDisplay
-            statuses={state.statuses}
+            statuses={state.statuses.filter(s => s.owner === 'player')}
           />
         }
       />

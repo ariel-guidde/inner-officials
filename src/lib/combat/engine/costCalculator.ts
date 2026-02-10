@@ -1,7 +1,7 @@
 import { GameState, Card, MODIFIER_STAT } from '../../../types/game';
 import { DEFAULT_JUDGE_EFFECTS } from '../constants';
-import { checkBalanced, checkChaos, checkDissonant } from './harmony';
-import { getModifierAdditive } from './statuses';
+import { checkBalanced, checkChaos, checkDissonant } from '../modules/harmony';
+import { getModifierAdditive } from '../modules/statuses';
 
 export interface EffectiveCosts {
   effectivePatienceCost: number;

@@ -3,7 +3,7 @@ import { CoreArgument, Status, STATUS_TRIGGER, MODIFIER_STAT, MODIFIER_OP, Eleme
 let coreArgStatusCounter = 0;
 
 function generateId(): string {
-  return `ca_status_${Date.now()}_${coreArgStatusCounter++}`;
+  return `ca_status_${++coreArgStatusCounter}`;
 }
 
 /**

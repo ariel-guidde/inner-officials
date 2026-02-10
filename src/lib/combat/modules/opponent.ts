@@ -1,20 +1,18 @@
 import { GameState, Intention, INTENTION_TYPE, IntentionType, GAME_EVENT_TYPE, Opponent, STATUS_TRIGGER, MODIFIER_STAT } from '../../../types/game';
 import { DEFAULT_JUDGE_EFFECTS } from '../constants';
-import { FLUSTERED_EFFECTS, OPPONENTS } from '../../../data/opponents';
-import { combatLogger } from '../../debug/combatLogger';
+import { OPPONENTS } from '../../../data/opponents';
+import { CombatLog, combatLogger } from '../../debug/combatLogger';
 import { emitGameEvent } from './events';
 import { addStanding, removeStanding } from './standing';
 import { consumeOpponentRevealTrigger, processStatusTrigger, getModifierMultiplier, getModifierAdditive } from './statuses';
 import { processCoreArgumentTrigger } from './coreArguments';
 
+// Re-export from flustered service for backward compat
+export { applyFlusteredMechanic, pickRandomFlustered } from '../services/flusteredService';
+
 export function pickRandomIntention(intentions: Intention[]): Intention {
   const index = Math.floor(Math.random() * intentions.length);
   return { ...intentions[index] };
-}
-
-export function pickRandomFlustered(): Intention {
-  const index = Math.floor(Math.random() * FLUSTERED_EFFECTS.length);
-  return { ...FLUSTERED_EFFECTS[index] };
 }
 
 // ==================== MULTI-OPPONENT HELPERS ====================
@@ -41,69 +39,6 @@ export function updateOpponent(
   };
 }
 
-/** Sync the legacy `state.opponent` from the first entry in `opponents[]` */
-export function syncLegacyOpponent(state: GameState): GameState {
-  const primary = state.opponents[0];
-  if (!primary) return state;
-  return {
-    ...state,
-    opponent: {
-      name: primary.name,
-      face: primary.face,
-      maxFace: primary.maxFace,
-      standing: primary.standing,
-      currentIntention: primary.currentIntention,
-      nextIntention: primary.nextIntention,
-      coreArgument: primary.coreArgument,
-    },
-  };
-}
-
-/** Sync changes from legacy `state.opponent` back to `opponents[0]` */
-export function syncFromLegacyOpponent(state: GameState): GameState {
-  const primary = state.opponents[0];
-  if (!primary) return state;
-  return {
-    ...state,
-    opponents: state.opponents.map((o, i) =>
-      i === 0
-        ? {
-            ...o,
-            face: state.opponent.face,
-            maxFace: state.opponent.maxFace,
-            standing: state.opponent.standing,
-            currentIntention: state.opponent.currentIntention,
-            nextIntention: state.opponent.nextIntention,
-            coreArgument: state.opponent.coreArgument,
-          }
-        : o
-    ),
-  };
-}
-
-// ==================== FLUSTERED ====================
-
-export function applyFlusteredMechanic(state: GameState): GameState {
-  let nextState = state;
-
-  for (const opp of nextState.opponents) {
-    if (opp.face > 0) continue;
-
-    const flustered = pickRandomFlustered();
-    nextState = updateOpponent(nextState, opp.id, (o) => ({
-      ...o,
-      face: Math.floor(o.maxFace / 2),
-      nextIntention: o.currentIntention,
-      currentIntention: flustered,
-    }));
-    combatLogger.logSystemEvent('Opponent Flustered', { opponent: opp.name, effect: flustered.name });
-  }
-
-  // Sync to legacy
-  nextState = syncLegacyOpponent(nextState);
-  return nextState;
-}
-
 // ==================== INTENTION DESCRIPTION ====================
 
 function getIntentionDescription(intention: Intention): string {
@@ -125,7 +60,7 @@ function getIntentionDescription(intention: Intention): string {
 
 // ==================== EXECUTE SINGLE OPPONENT ACTION ====================
 
-export function executeOpponentAction(state: GameState, intention: Intention, opponentId?: string): GameState {
+export function executeOpponentAction(state: GameState, intention: Intention, opponentId?: string, log: CombatLog = combatLogger): GameState {
   const beforeState = state;
   let nextState = { ...state };
   const judgeEffects = state.judge?.effects ?? DEFAULT_JUDGE_EFFECTS;
@@ -139,7 +74,7 @@ export function executeOpponentAction(state: GameState, intention: Intention, op
     );
     if (negateIndex >= 0) {
       const negateStatus = nextState.statuses[negateIndex];
-      combatLogger.log('system', `${negateStatus.name} negated the attack!`, { effect: negateStatus.name });
+      log.log('system', `${negateStatus.name} negated the attack!`, { effect: negateStatus.name });
       nextState = {
         ...nextState,
         statuses: nextState.statuses.filter((_, i) => i !== negateIndex),
@@ -199,7 +134,7 @@ export function executeOpponentAction(state: GameState, intention: Intention, op
   } else if (modifiedIntention.type === INTENTION_TYPE.STALL) {
     nextState.patience -= modifiedIntention.value;
   } else if (modifiedIntention.type === INTENTION_TYPE.FLUSTERED) {
-    combatLogger.logSystemEvent('Opponent Flustered', { effect: modifiedIntention.name });
+    log.logSystemEvent('Opponent Flustered', { effect: modifiedIntention.name });
   }
 
   const oppName = opponentId
@@ -215,7 +150,7 @@ export function executeOpponentAction(state: GameState, intention: Intention, op
     statChanges,
   });
 
-  combatLogger.logAIAction(
+  log.logAIAction(
     modifiedIntention.name,
     modifiedIntention.type,
     modifiedIntention.value,
@@ -238,17 +173,16 @@ export function advanceOpponentIntention(state: GameState, opponentId?: string):
   const template = OPPONENTS.find((t) => t.name === opp.templateName);
   if (!template) return state;
 
-  let nextState = updateOpponent(state, targetId, (o) => ({
-    ...o,
-    currentIntention: o.nextIntention || pickRandomIntention(template.intentions),
-    nextIntention: pickRandomIntention(template.intentions),
-  }));
+  const nextState = updateOpponent(state, targetId, (o) => {
+    const hasQueued = o.intentionQueue.length > 0;
+    return {
+      ...o,
+      currentIntention: o.nextIntention || pickRandomIntention(template.intentions),
+      nextIntention: hasQueued ? o.intentionQueue[0] : pickRandomIntention(template.intentions),
+      intentionQueue: hasQueued ? o.intentionQueue.slice(1) : o.intentionQueue,
+    };
+  });
 
-  // Consume reveal trigger when intention changes
-  nextState = consumeOpponentRevealTrigger(nextState, targetId);
-
-  // Sync to legacy opponent
-  nextState = syncLegacyOpponent(nextState);
   return nextState;
 }
 
@@ -258,14 +192,18 @@ export function advanceOpponentIntention(state: GameState, opponentId?: string):
  * Execute all opponent actions in sequence at turn end.
  * Each opponent acts with their current intention, then advances to the next.
  */
-export function executeAllOpponentActions(state: GameState): GameState {
+export function executeAllOpponentActions(state: GameState, log: CombatLog = combatLogger): GameState {
   let nextState = state;
 
   for (const opp of nextState.opponents) {
     if (!opp.currentIntention) continue;
 
     // Execute the current intention
-    nextState = executeOpponentAction(nextState, opp.currentIntention, opp.id);
+    nextState = executeOpponentAction(nextState, opp.currentIntention, opp.id, log);
+
+    // Consume reveal trigger before advancing — the revealed intention (which was "next" last turn)
+    // is now "current" being executed, so the player has seen it
+    nextState = consumeOpponentRevealTrigger(nextState, opp.id);
 
     // Advance to next intention
     nextState = advanceOpponentIntention(nextState, opp.id);

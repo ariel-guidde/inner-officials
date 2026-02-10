@@ -160,6 +160,7 @@ export interface StatusModifier {
 
 export interface Status {
   id: string;
+  templateId?: string;            // References StatusTemplate.id when created from template
   name: string;
   description: string;
   owner: 'player' | 'opponent';
@@ -207,11 +208,15 @@ export interface Card {
   patienceCost: number;
   faceCost: number;
   description: DescriptionPart[];
+  // Legacy closure-based effects (removed after full migration)
   effect: (state: GameState, drawCards?: DrawCardsFunction) => GameState;
+  targetedEffect?: (state: GameState, targets: TargetedEffectContext, drawCards?: DrawCardsFunction) => GameState;
+  // Data-driven effects (new)
+  effects?: import('./effects').EffectDef[];
+  targetedEffects?: import('./effects').EffectDef[];
+  //
   isBad?: boolean; // Bad cards are removed from game when played
   removeAfterPlay?: boolean; // Fire cards that burn out after use
-  // Targeting system
-  targetedEffect?: (state: GameState, targets: TargetedEffectContext, drawCards?: DrawCardsFunction) => GameState;
   targetRequirement?: TargetRequirement;
 }
 
@@ -265,6 +270,7 @@ export interface Opponent {
   standing: Standing;
   currentIntention: Intention | null;
   nextIntention: Intention | null;
+  intentionQueue: Intention[];
   coreArgument?: CoreArgument;
   templateName: string;
   statuses: Status[];
@@ -337,16 +343,6 @@ export interface GameState {
     removedFromGame: Card[];
     coreArgument?: CoreArgument;
   };
-  /** @deprecated Use opponents[] instead */
-  opponent: {
-    name: string;
-    face: number;
-    maxFace: number;
-    standing: Standing;
-    currentIntention: Intention | null;
-    nextIntention: Intention | null;
-    coreArgument?: CoreArgument;
-  };
   judge: {
     name: string;                        // Name of the selected judge
     effects: JudgeEffects;
@@ -375,4 +371,11 @@ export interface GameState {
   opponents: Opponent[];
   // Event system
   pendingEvents: GameEvent[];
+  // ID generation
+  nextId: number;
+  // Battle theme (selected at battle start from judge)
+  battleTheme?: {
+    background: string;    // CSS class
+    musicTracks: string[]; // Playlist
+  };
 }

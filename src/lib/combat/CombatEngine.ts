@@ -1,11 +1,13 @@
 import { GameState, Card, STATUS_TRIGGER } from '../../types/game';
-import { combatLogger } from '../debug/combatLogger';
+import { EffectContext } from '../../types/effects';
+import { CombatLog, combatLogger } from '../debug/combatLogger';
 import { JUDGES } from '../../data/judges';
 import { HARMONY_THRESHOLD, DEFAULT_JUDGE_EFFECTS } from './constants';
 import { calculateFlowType } from './modules/harmony';
-import { deductFaceCost, calculateEffectiveCosts } from './modules/costs';
+import { deductFaceCost, calculateEffectiveCosts } from './engine/costCalculator';
+import { resolveEffects } from './engine/effectResolver';
 import { checkVictory } from './modules/victory';
-import { executeAllOpponentActions, applyFlusteredMechanic, syncFromLegacyOpponent } from './modules/opponent';
+import { executeAllOpponentActions, applyFlusteredMechanic } from './modules/opponent';
 import { checkJudgeTrigger } from './modules/judge';
 import { addStanding, getTotalFavor } from './modules/standing';
 import { processCoreArgumentTrigger } from './modules/coreArguments';
@@ -21,12 +23,12 @@ export class CombatEngine {
   /**
    * Process a card play turn
    */
-  processTurn(state: GameState, card: Card, drawCards: DrawCardsFunction): GameState {
+  processTurn(state: GameState, card: Card, drawCards: DrawCardsFunction, log: CombatLog = combatLogger): GameState {
     const beforeState = state;
     let nextState = { ...state };
 
     // Update logger turn
-    combatLogger.setTurn(state.turnNumber ?? 1);
+    log.setTurn(state.turnNumber ?? 1);
 
     // 1. Flow Calculation
     const flowResult = calculateFlowType(nextState, card.element, HARMONY_THRESHOLD);
@@ -43,10 +45,18 @@ export class CombatEngine {
     const standingBefore = getTotalFavor(nextState.player.standing, nextState.judge.tierStructure);
     const tierBefore = nextState.player.standing.currentTier;
 
-    // Execute card effect (twice if chaos)
-    const executionCount = flowResult.isChaos ? 2 : 1;
-    for (let i = 0; i < executionCount; i++) {
+    // Execute card effects (1.5x multiplier if chaos)
+    const chaosMultiplier = flowResult.isChaos ? 1.5 : undefined;
+    if (card.effects) {
+      // Data-driven path
+      const effectContext: EffectContext = { sourceCardId: card.id };
+      nextState = resolveEffects(nextState, card.effects, effectContext, drawCards, chaosMultiplier);
+    } else {
+      // Legacy closure path
       nextState = card.effect(nextState, drawCards);
+      if (flowResult.isChaos) {
+        nextState = card.effect(nextState, drawCards);
+      }
     }
 
     // 4. Apply standing gain modifier from judge and core arguments
@@ -80,13 +90,12 @@ export class CombatEngine {
     nextState.harmonyStreak = flowResult.newHarmonyStreak;
 
     // 6. Flustered Mechanic - when opponent face breaks
-    nextState = syncFromLegacyOpponent(nextState);
-    nextState = applyFlusteredMechanic(nextState);
+    nextState = applyFlusteredMechanic(nextState, log);
 
     const finalState = checkVictory(nextState);
 
     // Log the card play
-    combatLogger.logCardPlayed(
+    log.logCardPlayed(
       card.name,
       card.element,
       { patience: costResult.effectivePatienceCost, face: costResult.effectiveFaceCost },
@@ -96,7 +105,7 @@ export class CombatEngine {
     );
 
     if (finalState.isGameOver) {
-      combatLogger.logSystemEvent('Game Over', { winner: finalState.winner });
+      log.logSystemEvent('Game Over', { winner: finalState.winner });
     }
 
     return finalState;
@@ -105,7 +114,7 @@ export class CombatEngine {
   /**
    * Process end of turn - all opponents act, judge triggers, effects tick
    */
-  processEndTurn(state: GameState): GameState {
+  processEndTurn(state: GameState, log: CombatLog = combatLogger): GameState {
     let nextState = { ...state };
     const judgeEffects = state.judge?.effects ?? DEFAULT_JUDGE_EFFECTS;
 
@@ -113,15 +122,15 @@ export class CombatEngine {
     const endTurnCost = judgeEffects.endTurnPatienceCost;
     nextState.patience -= endTurnCost;
 
-    combatLogger.log('system', `End Turn (-${endTurnCost} patience)`, { cost: endTurnCost });
+    log.log('system', `End Turn (-${endTurnCost} patience)`, { cost: endTurnCost });
 
     // 2. All opponents act in sequence
-    nextState = executeAllOpponentActions(nextState);
+    nextState = executeAllOpponentActions(nextState, log);
 
     // 3. Check judge trigger
     const judgeActions = this.getJudgeActions(nextState);
     if (judgeActions.length > 0) {
-      nextState = checkJudgeTrigger(nextState, endTurnCost, judgeActions);
+      nextState = checkJudgeTrigger(nextState, endTurnCost, judgeActions, log);
     }
 
     // 4. Process turn_end statuses
@@ -176,12 +185,12 @@ export class CombatEngine {
 const combatEngine = new CombatEngine();
 
 // Export convenience functions that use the singleton
-export function processTurn(state: GameState, card: Card, drawCards: DrawCardsFunction): GameState {
-  return combatEngine.processTurn(state, card, drawCards);
+export function processTurn(state: GameState, card: Card, drawCards: DrawCardsFunction, log?: CombatLog): GameState {
+  return combatEngine.processTurn(state, card, drawCards, log);
 }
 
-export function processEndTurn(state: GameState): GameState {
-  return combatEngine.processEndTurn(state);
+export function processEndTurn(state: GameState, log?: CombatLog): GameState {
+  return combatEngine.processEndTurn(state, log);
 }
 
 export function processStartTurn(state: GameState): GameState {

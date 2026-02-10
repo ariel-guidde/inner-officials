@@ -29,6 +29,10 @@ export function useAudio() {
     audioManager.playBattleMusic(battleNumber);
   }, []);
 
+  const playPlaylist = useCallback((tracks: string[]) => {
+    audioManager.playPlaylist(tracks);
+  }, []);
+
   const stopMusic = useCallback((fadeOut: boolean = true) => {
     audioManager.stopMusic(fadeOut);
   }, []);
@@ -42,6 +46,7 @@ export function useAudio() {
     setMuted,
     toggleMute,
     playBattleMusic,
+    playPlaylist,
     stopMusic,
   };
 }

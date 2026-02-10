@@ -21,6 +21,8 @@ interface BattleLayoutProps {
   debugPanel?: React.ReactNode;
   // Active effects display
   activeEffectsDisplay?: React.ReactNode;
+  // Judge theme background CSS class
+  backgroundClass?: string;
 }
 
 export default function BattleLayout({
@@ -35,11 +37,12 @@ export default function BattleLayout({
   campaignProgress,
   debugPanel,
   activeEffectsDisplay,
+  backgroundClass,
 }: BattleLayoutProps) {
   return (
     <div className="relative h-screen bg-stone-950 text-stone-100 font-serif overflow-hidden flex flex-col">
       {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-stone-900/50 to-stone-950 pointer-events-none" />
+      <div className={`absolute inset-0 pointer-events-none ${backgroundClass || 'bg-gradient-to-b from-stone-900/50 to-stone-950'}`} />
 
       {/* Top Row */}
       <div className="relative z-10 flex items-start justify-between p-4 pb-0 shrink-0">

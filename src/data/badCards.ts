@@ -50,7 +50,7 @@ export function generateBadCard(): Card {
 
   return {
     ...template,
-    id: `bad_${badCardCounter}_${Date.now()}`,
+    id: `bad_${badCardCounter}`,
     element,
   };
 }

@@ -1,11 +1,14 @@
 import { useCallback, useMemo } from 'react';
-import { GameState, Card, StateHistoryEntry, Intention, TargetedEffectContext, TURN_PHASE, COMBAT_LOG_ACTOR, CARD_DESTINATION, TARGET_TYPE, CoreArgument, Status } from '../types/game';
+import { GameState, Card, StateHistoryEntry, Intention, TargetedEffectContext, TURN_PHASE, COMBAT_LOG_ACTOR, TARGET_TYPE, CoreArgument, Status } from '../types/game';
+import { EffectContext } from '../types/effects';
 import { DEBATE_DECK } from '../data/cards';
 import { OPPONENTS } from '../data/opponents';
 import { JUDGES } from '../data/judges';
 import { processTurn, processEndTurn, processStartTurn, DEFAULT_JUDGE_EFFECTS, createInitialStanding, checkChaos } from '../lib/combat';
 import { createCoreArgumentStatuses } from '../lib/combat/modules/coreArgumentStatuses';
 import { pickRandomJudgeAction } from '../lib/combat/modules/judge';
+import { resolveRandomSelection, applyTargetDestination } from '../lib/combat/services/targetingService';
+import { resolveEffects } from '../lib/combat/engine/effectResolver';
 import { useDeck } from './useDeck';
 import { useGameState } from './useGameState';
 import { useTurnFlow } from './useTurnFlow';
@@ -99,17 +102,19 @@ function createInitialState(config: BattleConfig = {}): GameState {
       standing: createInitialStanding(),
       currentIntention,
       nextIntention,
+      intentionQueue: [],
       coreArgument: template.coreArgument,
       templateName: template.name,
       statuses: [] as Status[],
     };
   });
 
-  // Primary opponent for legacy field
-  const primary = opponents[0];
-
   // Randomly select a judge
   const judgeTemplate = JUDGES[Math.floor(Math.random() * JUDGES.length)];
+
+  // Pick theme from judge
+  const bg = judgeTemplate.theme.backgrounds[Math.floor(Math.random() * judgeTemplate.theme.backgrounds.length)];
+  const shuffledMusic = [...judgeTemplate.theme.musicTracks].sort(() => Math.random() - 0.5);
 
   // Pick initial judge action and apply it immediately
   const initialJudgeAction = pickRandomJudgeAction(judgeTemplate.judgeActions);
@@ -153,15 +158,6 @@ function createInitialState(config: BattleConfig = {}): GameState {
       removedFromGame: [],
       coreArgument: playerCoreArgument,
     },
-    opponent: {
-      name: primary.name,
-      face: primary.face,
-      maxFace: primary.maxFace,
-      standing: createInitialStanding(),
-      currentIntention: primary.currentIntention,
-      nextIntention: primary.nextIntention,
-      coreArgument: primary.coreArgument,
-    },
     judge: {
       name: judgeTemplate.name,
       effects: { ...initialEffects, activeDecrees: [initialDecree] },
@@ -183,6 +179,8 @@ function createInitialState(config: BattleConfig = {}): GameState {
     // Multi-opponent support
     opponents,
     pendingEvents: [],
+    nextId: 1,
+    battleTheme: { background: bg, musicTracks: shuffledMusic },
   };
 }
 
@@ -210,53 +208,39 @@ export function useGameLogic(config: BattleConfig = {}) {
 
         // Handle random selection if needed (before main effect)
         if (card.targetRequirement?.selectionMode === 'random' && !targetContext) {
-          const req = card.targetRequirement;
-          // Get valid targets
-          let candidates = nextState.player.hand.filter(c => c.id !== card.id);
-          if (req.filter) {
-            candidates = candidates.filter(c => req.filter!(c, nextState));
-          }
-          
-          if (candidates.length > 0) {
-            const randomIndex = Math.floor(Math.random() * candidates.length);
-            const selectedCard = candidates[randomIndex];
-            
-            // Apply destination (burn or discard)
-            if (req.destination === CARD_DESTINATION.BURN) {
-              nextState = deck.burnCard(nextState, selectedCard.id);
-            } else if (req.destination === CARD_DESTINATION.DISCARD) {
-              nextState = deck.discardCard(nextState, selectedCard.id);
-            }
-            
-            // Create target context for the effect
-            targetContext = { selectedCards: [selectedCard] };
+          const result = resolveRandomSelection(nextState, card);
+          nextState = result.state;
+          if (result.targetContext) {
+            targetContext = result.targetContext;
           }
         }
 
         // Handle targeted effects with selected cards
         if (card.targetRequirement && targetContext?.selectedCards) {
-          const req = card.targetRequirement;
-          
-          // Apply destination for selected cards (burn or discard)
-          if (req.destination === CARD_DESTINATION.BURN) {
-            targetContext.selectedCards.forEach(targetCard => {
-              nextState = deck.burnCard(nextState, targetCard.id);
-            });
-          } else if (req.destination === CARD_DESTINATION.DISCARD) {
-            targetContext.selectedCards.forEach(targetCard => {
-              nextState = deck.discardCard(nextState, targetCard.id);
-            });
-          }
+          nextState = applyTargetDestination(nextState, card, targetContext.selectedCards);
         }
 
         nextState = processTurn(nextState, card, deck.drawCards);
 
-        // Execute targeted effect (twice if chaos for double-execution)
-        if (card.targetedEffect && targetContext) {
+        // Execute targeted effects (1.5x multiplier if chaos)
+        if (targetContext) {
           const isChaos = checkChaos(prevState.lastElement, card.element);
-          const execCount = isChaos ? 2 : 1;
-          for (let i = 0; i < execCount; i++) {
+          const chaosMultiplier = isChaos ? 1.5 : undefined;
+
+          if (card.targetedEffects) {
+            // Data-driven path
+            const effectCtx: EffectContext = {
+              selectedCards: targetContext.selectedCards,
+              targetOpponentId: targetContext.targetOpponentId,
+              sourceCardId: card.id,
+            };
+            nextState = resolveEffects(nextState, card.targetedEffects, effectCtx, deck.drawCards, chaosMultiplier);
+          } else if (card.targetedEffect) {
+            // Legacy closure path
             nextState = card.targetedEffect(nextState, targetContext, deck.drawCards);
+            if (isChaos) {
+              nextState = card.targetedEffect(nextState, targetContext, deck.drawCards);
+            }
           }
         }
 
@@ -390,19 +374,19 @@ export function useGameLogic(config: BattleConfig = {}) {
     if (!state.isGameOver) return null;
     const maxOpponentTier = state.opponents.length > 0
       ? Math.max(...state.opponents.map(o => o.standing.currentTier))
-      : state.opponent.standing.currentTier;
+      : 0;
     const opponentNames = state.opponents.map(o => o.name).join(' & ');
     return {
       won: state.winner === COMBAT_LOG_ACTOR.PLAYER,
       finalFace: state.player.face,
-      opponentName: opponentNames || state.opponent.name,
+      opponentName: opponentNames || 'Opponent',
       playerTier: state.player.standing.currentTier,
       opponentTier: maxOpponentTier,
       maxTier: state.judge.tierStructure.length > 0
         ? Math.max(...state.judge.tierStructure.map(t => t.tierNumber))
         : 0,
     };
-  }, [state.isGameOver, state.winner, state.player.face, state.opponent.name, state.opponents, state.player.standing.currentTier, state.opponent.standing.currentTier, state.judge.tierStructure]);
+  }, [state.isGameOver, state.winner, state.player.face, state.opponents, state.player.standing.currentTier, state.judge.tierStructure]);
 
   const debug: DebugInterface = useMemo(
     () => ({
