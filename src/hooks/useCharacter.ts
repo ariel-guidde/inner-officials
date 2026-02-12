@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { CharacterAppearance, DEFAULT_CHARACTER, HairStyle, Clothing, Accessory } from '../types/character';
+import { CharacterAppearance, DEFAULT_CHARACTER } from '../types/character';
 
 const STORAGE_KEY = 'inner-officials-character';
 
@@ -30,16 +30,8 @@ export function useCharacter() {
     saveCharacter(character);
   }, [character]);
 
-  const setHair = useCallback((hair: HairStyle) => {
-    setCharacter(prev => ({ ...prev, hair }));
-  }, []);
-
-  const setClothing = useCallback((clothing: Clothing) => {
-    setCharacter(prev => ({ ...prev, clothing }));
-  }, []);
-
-  const setAccessory = useCallback((accessory: Accessory) => {
-    setCharacter(prev => ({ ...prev, accessory }));
+  const setAttire = useCallback((attireId: string) => {
+    setCharacter(prev => ({ ...prev, attireId }));
   }, []);
 
   const setName = useCallback((name: string) => {
@@ -52,9 +44,7 @@ export function useCharacter() {
 
   return {
     character,
-    setHair,
-    setClothing,
-    setAccessory,
+    setAttire,
     setName,
     reset,
   };
