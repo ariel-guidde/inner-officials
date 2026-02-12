@@ -2,7 +2,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Element, TargetRequirement } from '../../../types/game';
 import ElementIcon from '../ElementIcon';
 import { renderDescription } from '../../../lib/describe';
-import { X, Check, Target } from 'lucide-react';
+import { X, Check, Target, Crosshair } from 'lucide-react';
+import { SPRING_PRESETS } from '../../../lib/animations/constants';
 
 interface TargetingOverlayProps {
   isActive: boolean;
@@ -98,24 +99,72 @@ export default function TargetingOverlay({
               return (
                 <motion.button
                   key={card.id}
-                  whileHover={{ scale: 1.05, y: -5 }}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{
+                    opacity: 1,
+                    scale: 1,
+                    y: selected ? -10 : 0,
+                  }}
+                  whileHover={{ scale: 1.1, y: -8 }}
                   whileTap={{ scale: 0.95 }}
+                  transition={SPRING_PRESETS.bouncy}
                   onClick={() => selected ? onDeselectTarget(card) : onSelectTarget(card)}
                   className={`
                     relative w-32 h-44 ${ELEMENT_BG[card.element]} border-2 rounded-xl p-2 text-left
                     flex flex-col shadow-xl transition-all
                     ${selected
-                      ? 'border-amber-400 ring-2 ring-amber-400/50'
+                      ? 'border-amber-400 ring-4 ring-amber-400/50'
                       : `${ELEMENT_BORDERS[card.element]} hover:border-amber-400/50`
                     }
                   `}
                 >
-                  {/* Selection indicator */}
-                  {selected && (
-                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center">
-                      <Check className="w-4 h-4 text-black" />
-                    </div>
+                  {/* Pulsing glow for valid targets */}
+                  {!selected && (
+                    <motion.div
+                      animate={{
+                        opacity: [0.3, 0.6, 0.3],
+                        scale: [1, 1.05, 1],
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: 'easeInOut',
+                      }}
+                      className="absolute inset-0 rounded-xl border-2 border-amber-400/40"
+                      style={{
+                        boxShadow: '0 0 20px rgba(251, 191, 36, 0.5)',
+                      }}
+                    />
                   )}
+
+                  {/* Selection indicator with animation */}
+                  {selected && (
+                    <motion.div
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={SPRING_PRESETS.dramatic}
+                      className="absolute -top-2 -right-2 w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center border-2 border-amber-300"
+                      style={{
+                        boxShadow: '0 0 20px rgba(251, 191, 36, 0.8)',
+                      }}
+                    >
+                      <Check className="w-5 h-5 text-black" strokeWidth={3} />
+                    </motion.div>
+                  )}
+
+                  {/* Crosshair indicator */}
+                  <motion.div
+                    animate={{
+                      rotate: 360,
+                      opacity: selected ? 1 : 0.3,
+                    }}
+                    transition={{
+                      rotate: { duration: 3, repeat: Infinity, ease: 'linear' },
+                    }}
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                  >
+                    <Crosshair className="w-12 h-12 text-amber-400/40" />
+                  </motion.div>
 
                   {/* Card content */}
                   <div className="flex items-center gap-1 mb-1">

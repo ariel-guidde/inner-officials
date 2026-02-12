@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Trophy, Skull, Heart, ChevronUp, ArrowRight, Home, Swords } from 'lucide-react';
+import { Trophy, Skull, Heart, ChevronUp, ArrowRight, Home, Swords, Minus } from 'lucide-react';
 import { BattleResult } from '../../hooks/useSession';
 import { SessionState } from '../../types/game';
 
@@ -34,20 +34,30 @@ export default function BattleSummary({
             animate={{ scale: 1 }}
             transition={{ delay: 0.2, type: 'spring' }}
             className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-4 ${
-              result.won
+              result.outcome === 'won'
                 ? 'bg-amber-500/20 border-2 border-amber-500'
-                : 'bg-rose-500/20 border-2 border-rose-500'
+                : result.outcome === 'tied'
+                  ? 'bg-blue-500/20 border-2 border-blue-500'
+                  : 'bg-rose-500/20 border-2 border-rose-500'
             }`}
           >
-            {result.won ? (
+            {result.outcome === 'won' ? (
               <Trophy className="w-10 h-10 text-amber-400" />
+            ) : result.outcome === 'tied' ? (
+              <Minus className="w-10 h-10 text-blue-400" />
             ) : (
               <Skull className="w-10 h-10 text-rose-400" />
             )}
           </motion.div>
 
-          <h2 className={`text-2xl font-bold mb-2 ${result.won ? 'text-amber-100' : 'text-rose-100'}`}>
-            {result.won ? 'Victory!' : 'Defeat'}
+          <h2 className={`text-2xl font-bold mb-2 ${
+            result.outcome === 'won'
+              ? 'text-amber-100'
+              : result.outcome === 'tied'
+                ? 'text-blue-100'
+                : 'text-rose-100'
+          }`}>
+            {result.outcome === 'won' ? 'Victory!' : result.outcome === 'tied' ? 'Stalemate' : 'Defeat'}
           </h2>
           <p className="text-stone-400">
             Battle against <span className="text-stone-200">{result.opponentName}</span>
@@ -98,9 +108,11 @@ export default function BattleSummary({
                   i < session.battlesWon
                     ? 'bg-amber-500'
                     : i === session.currentBattle - 1
-                      ? result.won
+                      ? result.outcome === 'won'
                         ? 'bg-amber-500'
-                        : 'bg-rose-500'
+                        : result.outcome === 'tied'
+                          ? 'bg-blue-500'
+                          : 'bg-rose-500'
                       : 'bg-stone-700'
                 }`}
               />
@@ -108,12 +120,14 @@ export default function BattleSummary({
           </div>
 
           <div className="text-sm text-stone-400 text-center">
-            {result.won ? (
+            {result.outcome === 'won' ? (
               battlesRemaining > 0 ? (
                 <span>{battlesRemaining} battle{battlesRemaining > 1 ? 's' : ''} remaining</span>
               ) : (
                 <span className="text-amber-400">Campaign Complete!</span>
               )
+            ) : result.outcome === 'tied' ? (
+              <span className="text-blue-400">Battle Tied - No Progress</span>
             ) : (
               <span className="text-rose-400">Campaign Failed</span>
             )}
@@ -147,7 +161,7 @@ export default function BattleSummary({
             <span>Menu</span>
           </button>
 
-          {result.won && battlesRemaining > 0 && (
+          {result.outcome === 'won' && battlesRemaining > 0 && (
             <motion.button
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}

@@ -127,6 +127,9 @@ export class CombatEngine {
     // 2. All opponents act in sequence
     nextState = executeAllOpponentActions(nextState, log);
 
+    // 2.5. Apply flustered mechanic after opponent actions
+    nextState = applyFlusteredMechanic(nextState, log);
+
     // 3. Check judge trigger
     const judgeActions = this.getJudgeActions(nextState);
     if (judgeActions.length > 0) {

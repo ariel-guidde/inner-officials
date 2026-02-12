@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Swords, Hourglass, Zap, HelpCircle, TrendingDown, TrendingUp } from 'lucide-react';
+import { Heart, Swords, Hourglass, Zap, HelpCircle, TrendingDown, TrendingUp, Target, Crosshair } from 'lucide-react';
 import { Intention, JudgeEffects, INTENTION_TYPE, IntentionType, TierDefinition, Opponent } from '../../../types/game';
+import { SPRING_PRESETS } from '../../../lib/animations/constants';
 
 interface OpponentInfoPanelProps {
   opponents: Opponent[];
@@ -83,19 +84,58 @@ function SingleOpponentPanel({
   };
 
   return (
-    <div
-      className={`panel p-4 w-56 transition-all ${
+    <motion.div
+      animate={isSelectable ? {
+        scale: [1, 1.05, 1],
+        boxShadow: [
+          '0 0 20px rgba(239, 68, 68, 0.5)',
+          '0 0 40px rgba(239, 68, 68, 0.8)',
+          '0 0 20px rgba(239, 68, 68, 0.5)',
+        ],
+      } : {}}
+      transition={{
+        duration: 1.5,
+        repeat: isSelectable ? Infinity : 0,
+        ease: 'easeInOut',
+      }}
+      whileHover={isSelectable ? { scale: 1.08 } : {}}
+      className={`panel p-4 w-56 transition-all relative ${
         isSelectable
-          ? 'cursor-pointer ring-2 ring-red-500/50 hover:ring-red-400 animate-pulse'
+          ? 'cursor-pointer ring-4 ring-red-500/50'
           : ''
-      } ${isSelected ? 'ring-2 ring-amber-500' : ''}`}
+      } ${isSelected ? 'ring-4 ring-amber-500' : ''}`}
       onClick={isSelectable ? onClick : undefined}
     >
-      {/* Targeting indicator */}
+      {/* Targeting crosshairs */}
       {isSelectable && (
-        <div className="text-center text-xs text-red-400 font-medium mb-2 bg-red-900/30 rounded py-0.5">
-          Click to target
-        </div>
+        <>
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+            className="absolute top-4 right-4 pointer-events-none"
+          >
+            <Crosshair className="w-8 h-8 text-red-400" />
+          </motion.div>
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: [0.8, 1.2, 0.8] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute inset-0 border-4 border-red-500/30 rounded-xl pointer-events-none"
+          />
+        </>
+      )}
+
+      {/* Targeting indicator banner */}
+      {isSelectable && (
+        <motion.div
+          initial={{ y: -10, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={SPRING_PRESETS.bouncy}
+          className="text-center text-xs text-red-100 font-bold mb-2 bg-red-600/80 rounded py-1 px-2 flex items-center justify-center gap-1"
+        >
+          <Target className="w-3 h-3" />
+          SELECT TARGET
+        </motion.div>
       )}
       {/* Header with sprite */}
       <div className="flex items-center gap-3 mb-3">
@@ -239,7 +279,7 @@ function SingleOpponentPanel({
           </AnimatePresence>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 

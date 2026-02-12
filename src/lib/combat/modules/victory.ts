@@ -6,7 +6,10 @@ import { getCombatResult } from './standing';
  *
  * Victory conditions:
  * - Player face <= 0: Opponent wins
- * - Patience <= 0: Player wins if their tier > ALL opponent tiers. Tie goes to opponent.
+ * - Patience <= 0:
+ *   - Player tier > ALL opponent tiers: Player wins
+ *   - Player tier = max opponent tier: Tie (winner = null)
+ *   - Player tier < max opponent tier: Opponent wins
  */
 export function checkVictory(state: GameState): GameState {
   // Player loses face completely - opponent wins by default
@@ -29,7 +32,12 @@ export function checkVictory(state: GameState): GameState {
       return { ...state, isGameOver: true, winner: COMBAT_LOG_ACTOR.PLAYER };
     }
 
-    // Opponent wins on tie or if any opponent has higher tier
+    // NEW: Tie when player tier equals max opponent tier
+    if (result.playerTier === maxOpponentTier) {
+      return { ...state, isGameOver: true, winner: null };
+    }
+
+    // Opponent wins if they have higher tier
     return { ...state, isGameOver: true, winner: COMBAT_LOG_ACTOR.OPPONENT };
   }
 

@@ -229,6 +229,7 @@ export const SCREEN = {
   PRE_BATTLE: 'pre-battle',
   BATTLE: 'battle',
   BATTLE_SUMMARY: 'battle-summary',
+  REWARD_SELECTION: 'reward-selection',
   CAMPAIGN_MENU: 'campaign-menu',
   CAMPAIGN: 'campaign',
   AVATAR_BUILDER: 'avatar-builder',

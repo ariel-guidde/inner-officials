@@ -7,6 +7,7 @@ import Settings from './components/menu/Settings';
 import PreBattle from './components/menu/PreBattle';
 import BattleArena from './components/game/BattleArena';
 import BattleSummary from './components/game/BattleSummary';
+import RewardSelection, { RewardType } from './components/game/RewardSelection';
 import CampaignMenu from './components/menu/CampaignMenu';
 import CampaignScreen from './components/campaign/CampaignScreen';
 import AvatarBuilder from './components/menu/AvatarBuilder';
@@ -17,6 +18,7 @@ import { useAudio } from './hooks/useAudio';
 import { usePlayerSave } from './hooks/usePlayerSave';
 import { useCampaign } from './hooks/useCampaign';
 import { OPPONENTS } from './data/opponents';
+import { calculateCombatRewards } from './lib/combat/modules/victory';
 
 const DEFAULT_CAMPAIGN_BATTLES = 3;
 
@@ -108,7 +110,7 @@ function App() {
       if (result) {
         if (isCampaignBattle && campaignBattleEventRef.current) {
           // Record campaign battle result
-          recordCampaignBattleResult(result.won, campaignBattleEventRef.current);
+          recordCampaignBattleResult(result.outcome === 'won', campaignBattleEventRef.current);
           campaignBattleEventRef.current = null;
           setIsCampaignBattle(false);
           setCurrentScreen('campaign');
@@ -187,14 +189,42 @@ function App() {
   };
 
   const handleContinueBattleSession = useCallback(() => {
+    // After winning, go to reward selection
+    setCurrentScreen('reward-selection');
+  }, []);
+
+  const handleSelectReward = useCallback((rewardType: RewardType) => {
+    // Calculate rewards from last battle result
+    const result = lastBattleResult;
+    if (!result) return;
+
+    const combatResult = {
+      playerTier: result.playerTier,
+      opponentTier: result.opponentTier,
+      maxTier: result.maxTier,
+    };
+    const rewards = calculateCombatRewards(combatResult);
+
+    // Apply selected reward
+    let bonusFace = 0;
+    let bonusStanding = 0;
+
+    if (rewardType === 'heal') {
+      bonusFace = rewards.faceHealing;
+    } else if (rewardType === 'standing') {
+      bonusStanding = rewards.startingStanding;
+    }
+
+    // Advance to next battle with bonuses applied
     advanceToNextBattle();
     startNewBattle({
-      playerStartingFace: session.playerFaceCarryOver,
+      playerStartingFace: session.playerFaceCarryOver + bonusFace,
       opponentIndex: session.currentBattle,
       deckCardIds: playerSave.activeDeck?.cardIds,
+      startingStanding: bonusStanding,
     });
     setCurrentScreen('battle');
-  }, [advanceToNextBattle, startNewBattle, session.playerFaceCarryOver, session.currentBattle, playerSave.activeDeck]);
+  }, [advanceToNextBattle, startNewBattle, session.playerFaceCarryOver, session.currentBattle, playerSave.activeDeck, lastBattleResult]);
 
   const getTransitionType = (): 'fade' | 'slide' | 'scroll' | 'zoom' => {
     if (currentScreen === 'battle') return 'fade'; // Battle screens fade in
@@ -240,6 +270,19 @@ function App() {
             session={session}
             onContinue={handleContinueBattleSession}
             onReturnToMenu={handleBack}
+          />
+        ) : (
+          <MainMenu onNavigate={handleNavigate} />
+        );
+      case 'reward-selection':
+        return lastBattleResult ? (
+          <RewardSelection
+            combatResult={{
+              playerTier: lastBattleResult.playerTier,
+              opponentTier: lastBattleResult.opponentTier,
+              maxTier: lastBattleResult.maxTier,
+            }}
+            onSelectReward={handleSelectReward}
           />
         ) : (
           <MainMenu onNavigate={handleNavigate} />

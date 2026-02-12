@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useRef, useEffect } from 'react';
 import { SPRING_PRESETS, TANG_COLORS } from '../../lib/animations/constants';
+import { Screen } from '../../types/game';
 import LoadingScreen from './LoadingScreen';
 
 interface ScreenTransitionProps {
@@ -17,6 +18,18 @@ export default function ScreenTransition({
   direction = 'right',
 }: ScreenTransitionProps) {
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const previousKeyRef = useRef<string>(transitionKey);
+  const [fromScreen, setFromScreen] = useState<Screen | undefined>();
+  const [toScreen, setToScreen] = useState<Screen | undefined>();
+
+  // Track screen transitions
+  useEffect(() => {
+    if (previousKeyRef.current !== transitionKey) {
+      setFromScreen(previousKeyRef.current as Screen);
+      setToScreen(transitionKey as Screen);
+      previousKeyRef.current = transitionKey;
+    }
+  }, [transitionKey]);
   const getVariants = () => {
     switch (transitionType) {
       case 'fade':
@@ -95,7 +108,7 @@ export default function ScreenTransition({
 
       {/* Loading screen during transitions */}
       <AnimatePresence>
-        {isTransitioning && <LoadingScreen />}
+        {isTransitioning && <LoadingScreen fromScreen={fromScreen} toScreen={toScreen} />}
       </AnimatePresence>
     </>
   );

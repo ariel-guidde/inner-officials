@@ -3,8 +3,10 @@ import { SessionState } from '../types/game';
 
 const DEFAULT_MAX_FACE = 60;
 
+export type BattleOutcome = 'won' | 'tied' | 'lost';
+
 export interface BattleResult {
-  won: boolean;
+  outcome: BattleOutcome;
   finalFace: number;
   opponentName: string;
   playerTier: number;
@@ -40,17 +42,22 @@ export function useSession(totalBattles: number = 3) {
     setLastBattleResult(result);
 
     setSession(prev => {
-      const newBattlesWon = result.won ? prev.battlesWon + 1 : prev.battlesWon;
+      const won = result.outcome === 'won';
+      const lost = result.outcome === 'lost';
+
+      const newBattlesWon = won ? prev.battlesWon + 1 : prev.battlesWon;
       const isLastBattle = prev.currentBattle >= prev.totalBattles;
 
-      // Session ends if lost a battle or completed all battles
-      const sessionEnds = !result.won || isLastBattle;
-      const sessionWon = sessionEnds && result.won && isLastBattle;
+      // Session ends if lost OR completed all battles after a win
+      // Ties don't end session but don't advance either
+      const sessionEnds = lost || (won && isLastBattle);
+      const sessionWon = sessionEnds && won && isLastBattle;
 
       return {
         ...prev,
         battlesWon: newBattlesWon,
-        playerFaceCarryOver: result.won ? result.finalFace : DEFAULT_MAX_FACE,
+        // On win: carry over face. On tie: reset to max. On loss: reset to max
+        playerFaceCarryOver: won ? result.finalFace : DEFAULT_MAX_FACE,
         isSessionOver: sessionEnds,
         sessionWon: sessionEnds ? sessionWon : null,
       };

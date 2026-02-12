@@ -1,9 +1,36 @@
+/**
+ * @fileoverview Element Particle System
+ *
+ * Burst particle effects for the five wuxing elements (Wood, Fire, Earth, Metal, Water).
+ * Each element has unique:
+ * - Colors (from ELEMENT_THEMES)
+ * - Particle shapes (leaf, flame, stone, spark, droplet)
+ * - Visual characteristics
+ *
+ * Used for:
+ * - Card play effects
+ * - Harmony state visualization
+ * - Element-themed visual feedback
+ *
+ * Features:
+ * - Configurable particle count, spread, velocity, duration
+ * - Element-specific particle shapes
+ * - Radial burst pattern
+ * - Random rotation during flight
+ * - GPU-accelerated transforms
+ *
+ * @module components/effects/ElementParticles
+ */
+
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { Element } from '../../types/game';
 import { ELEMENT_THEMES } from '../../lib/animations/constants';
 import { generateParticlePosition, getRandomSize } from '../../lib/animations/utils';
 
+/**
+ * Internal particle state for animation.
+ */
 interface Particle {
   id: string;
   x: number;
@@ -14,6 +41,9 @@ interface Particle {
   lifetime: number;
 }
 
+/**
+ * Props for the ElementParticles component.
+ */
 interface ElementParticlesProps {
   element: Element;
   x: number; // Origin X position
@@ -26,7 +56,29 @@ interface ElementParticlesProps {
 }
 
 /**
- * Renders element-themed particles that burst from a point
+ * Element particle burst effect component.
+ *
+ * Generates and animates element-themed particles bursting from a point.
+ * Each particle:
+ * - Uses element-specific color and shape
+ * - Moves outward from origin in radial pattern
+ * - Rotates randomly (±360°)
+ * - Fades out while shrinking to scale 0
+ *
+ * Particle shapes by element:
+ * - Wood: Leaf shape (rounded corners)
+ * - Fire: Flame shape (rounded top)
+ * - Earth: Stone shape (slightly rounded square)
+ * - Metal: Spark shape (rotated square/diamond)
+ * - Water: Droplet shape (circle)
+ *
+ * Default configuration:
+ * - Count: 20 particles
+ * - Spread: 120° cone
+ * - Velocity: 100px
+ * - Duration: 1.5s
+ *
+ * @param props - Particle configuration and origin position
  */
 export default function ElementParticles({
   element,
@@ -126,7 +178,7 @@ export default function ElementParticles({
 }
 
 /**
- * Container for managing multiple particle effects
+ * Particle effect configuration for container.
  */
 interface ParticleEffect {
   id: string;
@@ -139,11 +191,31 @@ interface ParticleEffect {
   duration?: number;
 }
 
+/**
+ * Props for the ElementParticlesContainer.
+ */
 interface ElementParticlesContainerProps {
   effects: ParticleEffect[];
   onEffectComplete?: (id: string) => void;
 }
 
+/**
+ * Container component for managing multiple particle effects simultaneously.
+ *
+ * Renders all particle effects in the array at once. Unlike other animation
+ * containers, this allows multiple particle bursts to play concurrently
+ * (e.g., when multiple cards are played in quick succession).
+ *
+ * @param props - Effect array and completion handler
+ *
+ * @example
+ * ```tsx
+ * <ElementParticlesContainer
+ *   effects={battleEffects.particleEffects}
+ *   onEffectComplete={battleEffects.removeParticleEffect}
+ * />
+ * ```
+ */
 export function ElementParticlesContainer({ effects, onEffectComplete }: ElementParticlesContainerProps) {
   return (
     <>
@@ -165,7 +237,7 @@ export function ElementParticlesContainer({ effects, onEffectComplete }: Element
 }
 
 /**
- * Harmony state particle effect (for wuxing compass)
+ * Props for the HarmonyParticles component.
  */
 interface HarmonyParticlesProps {
   isActive: boolean;
@@ -173,6 +245,28 @@ interface HarmonyParticlesProps {
   harmonyState: 'balanced' | 'neutral' | 'dissonant' | 'chaos';
 }
 
+/**
+ * Harmony-state-aware particle effect for wuxing compass.
+ *
+ * Generates particle bursts from center of screen (wuxing compass position)
+ * with particle count and velocity based on harmony state:
+ *
+ * Particle counts by harmony:
+ * - Balanced: 15 particles (calm, controlled)
+ * - Neutral: 8 particles (minimal)
+ * - Dissonant: 20 particles (increased tension)
+ * - Chaos: 35 particles (explosive)
+ *
+ * Velocities by harmony:
+ * - Balanced: 80px (smooth)
+ * - Neutral: 50px (gentle)
+ * - Dissonant: 100px (erratic)
+ * - Chaos: 130px (violent)
+ *
+ * Always uses 360° spread for full radial burst.
+ *
+ * @param props - Harmony state configuration
+ */
 export function HarmonyParticles({ isActive, element, harmonyState }: HarmonyParticlesProps) {
   if (!isActive) return null;
 

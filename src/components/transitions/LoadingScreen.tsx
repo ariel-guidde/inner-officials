@@ -1,7 +1,87 @@
 import { motion } from 'framer-motion';
 import { TANG_COLORS } from '../../lib/animations/constants';
+import { Screen } from '../../types/game';
 
-export default function LoadingScreen() {
+interface LoadingScreenProps {
+  fromScreen?: Screen;
+  toScreen?: Screen;
+}
+
+// Context-aware messages based on screen transitions
+function getLoadingMessage(from?: Screen, to?: Screen): { title: string; subtitle: string } {
+  // Entering battle
+  if (to === 'battle') {
+    return {
+      title: 'Enter the Court',
+      subtitle: 'Sharpen your wit and tongue...',
+    };
+  }
+
+  // Leaving battle
+  if (from === 'battle') {
+    if (to === 'battle-summary') {
+      return {
+        title: 'Judging Performance',
+        subtitle: 'The court deliberates...',
+      };
+    }
+    if (to === 'campaign') {
+      return {
+        title: 'Returning to Journey',
+        subtitle: 'Your reputation precedes you...',
+      };
+    }
+  }
+
+  // Campaign transitions
+  if (to === 'campaign') {
+    return {
+      title: 'The Journey Continues',
+      subtitle: 'Fortune favors the prepared...',
+    };
+  }
+
+  // Reward selection
+  if (to === 'reward-selection') {
+    return {
+      title: 'Victory Brings Gifts',
+      subtitle: 'Choose your boon wisely...',
+    };
+  }
+
+  // Pre-battle
+  if (to === 'pre-battle') {
+    return {
+      title: 'Preparing for Debate',
+      subtitle: 'Study your opponent...',
+    };
+  }
+
+  // Deck building
+  if (to === 'deck') {
+    return {
+      title: 'The Arsenal of Words',
+      subtitle: 'Craft your arguments...',
+    };
+  }
+
+  // Character customization
+  if (to === 'avatar-builder') {
+    return {
+      title: 'Imperial Wardrobe',
+      subtitle: 'Dress for success...',
+    };
+  }
+
+  // Default
+  return {
+    title: 'Inner Officials',
+    subtitle: 'Preparing the Court...',
+  };
+}
+
+export default function LoadingScreen({ fromScreen, toScreen }: LoadingScreenProps = {}) {
+  const { title, subtitle } = getLoadingMessage(fromScreen, toScreen);
   return (
     <motion.div
       initial={{ opacity: 1 }}
@@ -153,8 +233,11 @@ export default function LoadingScreen() {
           className="mt-12 text-center"
         >
           <motion.h2
+            key={title} // Re-animate when title changes
+            initial={{ opacity: 0, y: 10 }}
             animate={{
               opacity: [1, 0.6, 1],
+              y: 0,
             }}
             transition={{
               duration: 2,
@@ -166,11 +249,14 @@ export default function LoadingScreen() {
               textShadow: `0 0 20px ${TANG_COLORS.imperialGold}, 0 4px 8px rgba(0,0,0,0.5)`,
             }}
           >
-            Inner Officials
+            {title}
           </motion.h2>
           <motion.p
+            key={subtitle} // Re-animate when subtitle changes
+            initial={{ opacity: 0, y: 5 }}
             animate={{
               opacity: [0.7, 1, 0.7],
+              y: 0,
             }}
             transition={{
               duration: 1.5,
@@ -180,7 +266,7 @@ export default function LoadingScreen() {
             }}
             className="mt-2 text-amber-100 text-sm tracking-widest"
           >
-            Preparing the Court...
+            {subtitle}
           </motion.p>
         </motion.div>
 

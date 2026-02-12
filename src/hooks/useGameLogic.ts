@@ -376,8 +376,19 @@ export function useGameLogic(config: BattleConfig = {}) {
       ? Math.max(...state.opponents.map(o => o.standing.currentTier))
       : 0;
     const opponentNames = state.opponents.map(o => o.name).join(' & ');
+
+    // Determine outcome based on winner
+    let outcome: 'won' | 'tied' | 'lost';
+    if (state.winner === COMBAT_LOG_ACTOR.PLAYER) {
+      outcome = 'won';
+    } else if (state.winner === null) {
+      outcome = 'tied';
+    } else {
+      outcome = 'lost';
+    }
+
     return {
-      won: state.winner === COMBAT_LOG_ACTOR.PLAYER,
+      outcome,
       finalFace: state.player.face,
       opponentName: opponentNames || 'Opponent',
       playerTier: state.player.standing.currentTier,

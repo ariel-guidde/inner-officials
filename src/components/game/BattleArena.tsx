@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import BattleLayout from './battle/BattleLayout';
 import WuxingIndicator from './battle/WuxingIndicator';
 import OpponentInfoPanel from './battle/OpponentInfoPanel';
@@ -10,11 +10,17 @@ import ActionBar from './battle/ActionBar';
 import CampaignProgress from './battle/CampaignProgress';
 import DebugPanel from '../debug/DebugPanel';
 import TargetingOverlay from './battle/TargetingOverlay';
-import EventAnnouncement from './battle/EventAnnouncement';
+// import EventAnnouncement from './battle/EventAnnouncement'; // Removed - animations show everything now
 import ActiveEffectsDisplay from './battle/ActiveEffectsDisplay';
 import PileViewerModal, { PileType } from './battle/PileViewerModal';
+import { ElementParticlesContainer } from '../effects/ElementParticles';
+import { IntentionAnimationContainer } from '../effects/IntentionAnimation';
+import { JudgeDecreeAnimationContainer } from '../effects/JudgeDecreeAnimation';
+import { StatusEffectAnimationContainer } from '../effects/StatusEffectAnimation';
+import { TierAdvancementAnimationContainer } from '../effects/TierAdvancementAnimation';
 import { GameState, Card, SessionState, TargetRequirement, GameEvent } from '../../types/game';
 import { DebugInterface } from '../../hooks/useGameLogic';
+import { useBattleEffects } from '../../hooks/useBattleEffects';
 
 interface TargetingState {
   isTargeting: boolean;
@@ -51,12 +57,109 @@ interface BattleArenaProps {
   events?: EventsState;
 }
 
-export default function BattleArena({ onBack, session, state, playCard, endTurn, debug, targeting, events }: BattleArenaProps) {
-  const isBlocking = events?.isBlocking ?? false;
+export default function BattleArena({ onBack, session, state, playCard, endTurn, debug, targeting }: BattleArenaProps) {
+  // const isBlocking = events?.isBlocking ?? false; // Removed - animations are non-blocking now
   const [pileViewer, setPileViewer] = useState<{ type: PileType; isOpen: boolean }>({
     type: 'deck',
     isOpen: false,
   });
+
+  const battleEffects = useBattleEffects();
+  const previousOpponentsRef = useRef(state.opponents);
+  const previousDecreesRef = useRef(state.judge.effects.activeDecrees);
+  const previousStatusesRef = useRef(state.statuses);
+  const previousPlayerTierRef = useRef(state.player.standing.currentTier);
+
+  // Watch for player tier advancement
+  useEffect(() => {
+    const prevTier = previousPlayerTierRef.current;
+    const currentTier = state.player.standing.currentTier;
+
+    if (currentTier > prevTier) {
+      // Player advanced a tier!
+      const tierDef = state.judge.tierStructure.find(t => t.tierNumber === currentTier);
+      if (tierDef && tierDef.tierName) {
+        battleEffects.triggerTierAdvancement(currentTier, tierDef.tierName);
+      }
+    }
+
+    previousPlayerTierRef.current = currentTier;
+  }, [state.player.standing.currentTier, state.judge.tierStructure, battleEffects]);
+
+  // Watch for new statuses being added
+  useEffect(() => {
+    const prevStatuses = previousStatusesRef.current;
+    const currentStatuses = state.statuses;
+
+    // Check for new statuses
+    if (currentStatuses.length > prevStatuses.length) {
+      // Find newly added statuses
+      const newStatuses = currentStatuses.filter(
+        curr => !prevStatuses.some(prev => prev.id === curr.id)
+      );
+
+      // Trigger animation for each new status
+      newStatuses.forEach(status => {
+        // Determine if positive (buff) or negative (debuff)
+        // Check if any modifier has positive add operation
+        const isPositive = status.modifiers?.some(
+          m => m.op === 'add' && m.value > 0
+        ) ?? false;
+        battleEffects.triggerStatusEffect(status.name, status.owner, isPositive);
+      });
+    }
+
+    previousStatusesRef.current = currentStatuses;
+  }, [state.statuses, battleEffects]);
+
+  // Watch for new judge decrees
+  useEffect(() => {
+    const prevDecrees = previousDecreesRef.current;
+    const currentDecrees = state.judge.effects.activeDecrees;
+
+    // Check if a new decree was added
+    if (currentDecrees.length > prevDecrees.length) {
+      const newDecree = currentDecrees[currentDecrees.length - 1];
+      battleEffects.triggerJudgeDecree(newDecree.name, newDecree.description);
+    }
+
+    previousDecreesRef.current = currentDecrees;
+  }, [state.judge.effects.activeDecrees, battleEffects]);
+
+  // Watch for opponent intention changes (when they act)
+  useEffect(() => {
+    const prevOpponents = previousOpponentsRef.current;
+    const currentOpponents = state.opponents;
+
+    // Check if any opponent's current intention changed
+    for (let i = 0; i < currentOpponents.length; i++) {
+      const prev = prevOpponents[i];
+      const curr = currentOpponents[i];
+
+      if (prev && curr && prev.currentIntention && curr.currentIntention) {
+        // If current intention changed, they just acted
+        if (prev.currentIntention.name !== curr.currentIntention.name) {
+          battleEffects.triggerIntentionAnimation(
+            prev.currentIntention.name,
+            prev.currentIntention.type,
+            prev.currentIntention.value,
+            curr.name
+          );
+        }
+      }
+    }
+
+    previousOpponentsRef.current = currentOpponents;
+  }, [state.opponents, battleEffects]);
+
+  // Wrap playCard to trigger visual effects
+  const handlePlayCard = useCallback((card: Card) => {
+    // Trigger particle effect from center-bottom (hand position)
+    const x = window.innerWidth / 2;
+    const y = window.innerHeight - 100; // Above the hand
+    battleEffects.triggerCardEffect(card, x, y);
+    playCard(card);
+  }, [playCard, battleEffects]);
 
   const openPileViewer = (type: PileType) => {
     setPileViewer({ type, isOpen: true });
@@ -134,14 +237,14 @@ export default function BattleArena({ onBack, session, state, playCard, endTurn,
             playerFace={state.player.face}
             playerPoise={state.player.poise}
             gameState={state}
-            onPlayCard={playCard}
-            disabled={isBlocking || (targeting?.isTargeting ?? false)}
+            onPlayCard={handlePlayCard}
+            disabled={targeting?.isTargeting ?? false}
           />
         }
         actionBar={
           <ActionBar
             onEndTurn={endTurn}
-            disabled={state.isGameOver || isBlocking || (targeting?.isTargeting ?? false)}
+            disabled={state.isGameOver || (targeting?.isTargeting ?? false)}
             patienceCost={state.judge.effects.endTurnPatienceCost}
           />
         }
@@ -198,10 +301,10 @@ export default function BattleArena({ onBack, session, state, playCard, endTurn,
         </div>
       )}
 
-      {/* Event Announcement */}
-      {events && (
+      {/* Event Announcement - REMOVED: Animations show everything now */}
+      {/* {events && (
         <EventAnnouncement event={events.currentEvent} />
-      )}
+      )} */}
 
       {/* Pile Viewer Modal */}
       <PileViewerModal
@@ -209,6 +312,36 @@ export default function BattleArena({ onBack, session, state, playCard, endTurn,
         pileType={pileViewer.type}
         cards={getPileCards(pileViewer.type)}
         onClose={closePileViewer}
+      />
+
+      {/* Particle Effects */}
+      <ElementParticlesContainer
+        effects={battleEffects.particleEffects}
+        onEffectComplete={battleEffects.removeParticleEffect}
+      />
+
+      {/* Intention Animations */}
+      <IntentionAnimationContainer
+        animations={battleEffects.intentionAnimations}
+        onAnimationComplete={battleEffects.removeIntentionAnimation}
+      />
+
+      {/* Judge Decree Animations */}
+      <JudgeDecreeAnimationContainer
+        animations={battleEffects.judgeDecreeAnimations}
+        onAnimationComplete={battleEffects.removeJudgeDecreeAnimation}
+      />
+
+      {/* Status Effect Animations */}
+      <StatusEffectAnimationContainer
+        animations={battleEffects.statusEffectAnimations}
+        onAnimationComplete={battleEffects.removeStatusEffectAnimation}
+      />
+
+      {/* Tier Advancement Animation */}
+      <TierAdvancementAnimationContainer
+        animation={battleEffects.tierAdvancementAnimation}
+        onAnimationComplete={battleEffects.removeTierAdvancementAnimation}
       />
     </>
   );
