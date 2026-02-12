@@ -105,7 +105,15 @@ const CardInHand = forwardRef<HTMLDivElement, CardInHandProps>(function CardInHa
 
       {/* Card */}
       <motion.button
-        whileTap={canAfford ? { scale: 0.95 } : {}}
+        whileHover={canAfford ? {
+          scale: 1.05,
+          y: -10,
+          boxShadow: `0 20px 40px ${ELEMENT_BG[card.element]}80`,
+        } : {}}
+        whileTap={canAfford ? {
+          scale: 1.1,
+          rotate: [0, -5, 5, 0],
+        } : {}}
         onClick={() => canAfford && onPlay(card)}
         onMouseEnter={() => onHover(index)}
         onMouseLeave={() => onHover(null)}
@@ -113,7 +121,7 @@ const CardInHand = forwardRef<HTMLDivElement, CardInHandProps>(function CardInHa
         className={`
           w-32 h-44 ${bgColor} border-2 rounded-xl p-2 text-left
           flex flex-col shadow-xl
-          transition-colors
+          transition-all duration-200
           ${borderColor}
           ${isBadCard ? BAD_CARD_OVERLAY : ''}
           ${canAfford ? 'cursor-pointer hover:border-amber-400' : 'opacity-60 cursor-not-allowed'}

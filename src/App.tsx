@@ -10,6 +10,7 @@ import BattleSummary from './components/game/BattleSummary';
 import CampaignMenu from './components/menu/CampaignMenu';
 import CampaignScreen from './components/campaign/CampaignScreen';
 import AvatarBuilder from './components/menu/AvatarBuilder';
+import ScreenTransition from './components/transitions/ScreenTransition';
 import { useGameLogic, BattleConfig } from './hooks/useGameLogic';
 import { useSession } from './hooks/useSession';
 import { useAudio } from './hooks/useAudio';
@@ -195,82 +196,100 @@ function App() {
     setCurrentScreen('battle');
   }, [advanceToNextBattle, startNewBattle, session.playerFaceCarryOver, session.currentBattle, playerSave.activeDeck]);
 
-  switch (currentScreen) {
-    case 'menu':
-      return <MainMenu onNavigate={handleNavigate} />;
-    case 'deck':
-      return <DeckView playerSave={playerSave} onBack={handleBack} />;
-    case 'how-to-play':
-      return <HowToPlay onBack={handleBack} />;
-    case 'settings':
-      return <Settings onBack={handleBack} />;
-    case 'pre-battle':
-      return (
-        <PreBattle
-          opponentIndices={preBattleOpponentIndices}
-          onStartBattle={handleStartBattle}
-          onBack={handleBack}
-        />
-      );
-    case 'battle':
-      return (
-        <BattleArena
-          onBack={isCampaignBattle ? () => setCurrentScreen('campaign') : handleBack}
-          session={session}
-          state={state}
-          playCard={playCard}
-          endTurn={endTurn}
-          debug={debug}
-          targeting={targeting}
-          events={events}
-        />
-      );
-    case 'battle-summary':
-      return lastBattleResult ? (
-        <BattleSummary
-          result={lastBattleResult}
-          session={session}
-          onContinue={handleContinueBattleSession}
-          onReturnToMenu={handleBack}
-        />
-      ) : (
-        <MainMenu onNavigate={handleNavigate} />
-      );
-    case 'campaign-menu':
-      return (
-        <CampaignMenu
-          onBack={handleCampaignMenuBack}
-          onNewCampaign={handleStartNewCampaign}
-          onContinueCampaign={handleResumeCampaign}
-          hasSavedCampaign={hasSavedCampaign}
-        />
-      );
-    case 'avatar-builder':
-      return <AvatarBuilder onBack={handleBack} />;
-    case 'campaign':
-      return (
-        <CampaignScreen
-          campaign={campaign}
-          onBack={handleCampaignBack}
-          onPerformAction={performAction}
-          onMakeEventChoice={makeEventChoice}
-          onResolveEvent={resolveEvent}
-          onSkipEvent={skipEvent}
-          onDismissMessage={dismissOutcomeMessage}
-          onSelectDay={selectDay}
-          onRestUntilDawn={restUntilDawn}
-          isActionAvailable={isActionAvailable}
-          canAffordChoice={canAffordChoice}
-          canSkipEvent={canSkipEvent}
-          isCampaignOver={isCampaignOver}
-          segmentsRemainingToday={segmentsRemainingToday}
-          currentPeriod={currentPeriod}
-          isNightTime={isNightTime}
-        />
-      );
-    default:
-      return <MainMenu onNavigate={handleNavigate} />;
-  }
+  const getTransitionType = (): 'fade' | 'slide' | 'scroll' | 'zoom' => {
+    if (currentScreen === 'battle') return 'fade'; // Battle screens fade in
+    if (currentScreen === 'campaign') return 'scroll'; // Campaign unfurls like a scroll
+    return 'slide'; // Default slide for menu navigation
+  };
+
+  const renderScreen = () => {
+    switch (currentScreen) {
+      case 'menu':
+        return <MainMenu onNavigate={handleNavigate} />;
+      case 'deck':
+        return <DeckView playerSave={playerSave} onBack={handleBack} />;
+      case 'how-to-play':
+        return <HowToPlay onBack={handleBack} />;
+      case 'settings':
+        return <Settings onBack={handleBack} />;
+      case 'pre-battle':
+        return (
+          <PreBattle
+            opponentIndices={preBattleOpponentIndices}
+            onStartBattle={handleStartBattle}
+            onBack={handleBack}
+          />
+        );
+      case 'battle':
+        return (
+          <BattleArena
+            onBack={isCampaignBattle ? () => setCurrentScreen('campaign') : handleBack}
+            session={session}
+            state={state}
+            playCard={playCard}
+            endTurn={endTurn}
+            debug={debug}
+            targeting={targeting}
+            events={events}
+          />
+        );
+      case 'battle-summary':
+        return lastBattleResult ? (
+          <BattleSummary
+            result={lastBattleResult}
+            session={session}
+            onContinue={handleContinueBattleSession}
+            onReturnToMenu={handleBack}
+          />
+        ) : (
+          <MainMenu onNavigate={handleNavigate} />
+        );
+      case 'campaign-menu':
+        return (
+          <CampaignMenu
+            onBack={handleCampaignMenuBack}
+            onNewCampaign={handleStartNewCampaign}
+            onContinueCampaign={handleResumeCampaign}
+            hasSavedCampaign={hasSavedCampaign}
+          />
+        );
+      case 'avatar-builder':
+        return <AvatarBuilder onBack={handleBack} />;
+      case 'campaign':
+        return (
+          <CampaignScreen
+            campaign={campaign}
+            onBack={handleCampaignBack}
+            onPerformAction={performAction}
+            onMakeEventChoice={makeEventChoice}
+            onResolveEvent={resolveEvent}
+            onSkipEvent={skipEvent}
+            onDismissMessage={dismissOutcomeMessage}
+            onSelectDay={selectDay}
+            onRestUntilDawn={restUntilDawn}
+            isActionAvailable={isActionAvailable}
+            canAffordChoice={canAffordChoice}
+            canSkipEvent={canSkipEvent}
+            isCampaignOver={isCampaignOver}
+            segmentsRemainingToday={segmentsRemainingToday}
+            currentPeriod={currentPeriod}
+            isNightTime={isNightTime}
+          />
+        );
+      default:
+        return <MainMenu onNavigate={handleNavigate} />;
+    }
+  };
+
+  return (
+    <ScreenTransition
+      transitionKey={currentScreen}
+      transitionType={getTransitionType()}
+      direction="right"
+    >
+      {renderScreen()}
+    </ScreenTransition>
+  );
 }
 
 export default App
