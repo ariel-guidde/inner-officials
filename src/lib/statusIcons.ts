@@ -8,7 +8,6 @@ import {
   Flame,
   Droplets,
   Mountain,
-  Hammer,
   Zap,
   TrendingUp,
   TrendingDown,
