@@ -12,7 +12,7 @@ export default function PlayerInfoPanel({ face, maxFace, poise }: PlayerInfoPane
   const faceColor = facePercent > 50 ? 'bg-rose-500' : facePercent > 25 ? 'bg-orange-500' : 'bg-red-600';
 
   return (
-    <div className="flex items-center gap-4 bg-stone-900/60 border border-stone-700 rounded-xl px-4 py-2 backdrop-blur-sm">
+    <div data-player-panel className="flex items-center gap-4 bg-stone-900/60 border border-stone-700 rounded-xl px-4 py-2 backdrop-blur-sm">
       {/* Face */}
       <div className="flex items-center gap-2">
         <Heart className="w-4 h-4 icon-face shrink-0" />

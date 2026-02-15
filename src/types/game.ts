@@ -75,6 +75,7 @@ export interface Intention {
   name: string;
   type: IntentionType;
   value: number;
+  displayValue?: number; // Pre-calculated display value including modifiers
 }
 
 export type DrawCardsFunction = (state: GameState, count: number) => GameState;

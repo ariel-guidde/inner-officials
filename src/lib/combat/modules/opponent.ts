@@ -173,12 +173,38 @@ export function advanceOpponentIntention(state: GameState, opponentId?: string):
   const template = OPPONENTS.find((t) => t.name === opp.templateName);
   if (!template) return state;
 
+  const judgeEffects = state.judge?.effects ?? DEFAULT_JUDGE_EFFECTS;
+
+  // Helper to calculate displayValue for an intention
+  const calculateDisplayValue = (intention: Intention): Intention => {
+    let displayValue: number;
+
+    if (intention.type === INTENTION_TYPE.ATTACK) {
+      displayValue = Math.floor(intention.value * judgeEffects.damageModifier);
+    } else if (intention.type === INTENTION_TYPE.STANDING_GAIN) {
+      const baseGain = Math.floor(intention.value * judgeEffects.favorGainModifier);
+      const oppMultiplier = getModifierMultiplier(state, MODIFIER_STAT.FAVOR_GAIN_MULTIPLIER, 'opponent');
+      const oppBonus = getModifierAdditive(state, MODIFIER_STAT.STANDING_GAIN, 'opponent');
+      displayValue = Math.floor(baseGain * oppMultiplier) + oppBonus;
+    } else if (intention.type === INTENTION_TYPE.STANDING_DAMAGE) {
+      const oppDamageBonus = getModifierAdditive(state, MODIFIER_STAT.DAMAGE_MODIFIER, 'opponent');
+      displayValue = intention.value + oppDamageBonus;
+    } else {
+      displayValue = intention.value;
+    }
+
+    return { ...intention, displayValue };
+  };
+
   const nextState = updateOpponent(state, targetId, (o) => {
     const hasQueued = o.intentionQueue.length > 0;
+    const newCurrent = o.nextIntention || pickRandomIntention(template.intentions);
+    const newNext = hasQueued ? o.intentionQueue[0] : pickRandomIntention(template.intentions);
+
     return {
       ...o,
-      currentIntention: o.nextIntention || pickRandomIntention(template.intentions),
-      nextIntention: hasQueued ? o.intentionQueue[0] : pickRandomIntention(template.intentions),
+      currentIntention: calculateDisplayValue(newCurrent),
+      nextIntention: calculateDisplayValue(newNext),
       intentionQueue: hasQueued ? o.intentionQueue.slice(1) : o.intentionQueue,
     };
   });

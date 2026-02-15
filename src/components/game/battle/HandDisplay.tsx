@@ -12,12 +12,13 @@ interface HandDisplayProps {
   playerPoise?: number;
   gameState: GameState;
   onPlayCard: (card: Card) => void;
+  onShowCardDetails?: (card: Card) => void;
   disabled?: boolean;
 }
 
 const CARD_WIDTH = 128; // w-32 = 8rem = 128px
 
-export default function HandDisplay({ cards, patience: _patience, playerFace: _playerFace, playerPoise = 0, gameState, onPlayCard, disabled = false }: HandDisplayProps) {
+export default function HandDisplay({ cards, patience: _patience, playerFace: _playerFace, playerPoise = 0, gameState, onPlayCard, onShowCardDetails, disabled = false }: HandDisplayProps) {
   const [isHandHovered, setIsHandHovered] = useState(false);
   const [hoveredCardIndex, setHoveredCardIndex] = useState<number | null>(null);
 
@@ -75,6 +76,7 @@ export default function HandDisplay({ cards, patience: _patience, playerFace: _p
                   gameState={gameState}
                   onPlay={disabled ? () => {} : onPlayCard}
                   onHover={disabled ? () => {} : setHoveredCardIndex}
+                  onShowDetails={onShowCardDetails}
                 />
               );
             })}

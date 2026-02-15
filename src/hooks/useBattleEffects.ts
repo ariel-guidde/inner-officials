@@ -2,17 +2,19 @@
  * @fileoverview Battle Effects Management System
  *
  * Centralized animation state management for all battle visual effects.
+ * Uses a priority-based animation queue for sequential playback.
  * Follows game industry patterns for animation orchestration:
  * - Event-driven triggers
- * - Queue-based playback
+ * - Queue-based sequential playback
  * - Automatic cleanup
  * - Non-blocking by default
  *
  * @module hooks/useBattleEffects
  */
 
-import { useState, useCallback } from 'react';
+import { useRef, useCallback } from 'react';
 import { Element, Card, IntentionType } from '../types/game';
+import { useAnimationQueue } from './useAnimationQueue';
 
 /**
  * Particle effect burst configuration.
@@ -73,16 +75,38 @@ export interface TierAdvancementAnimation {
 }
 
 /**
- * Battle effects management hook.
+ * Projectile animation configuration.
+ * Directional attack animation from opponent to player.
+ */
+export interface ProjectileAnimation {
+  id: string;
+  intentionType: IntentionType;
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+}
+
+/**
+ * Battle effects management hook with sequential animation queue.
  *
  * Centralizes state management for all battle animations including:
  * - Element particle effects when cards are played
+ * - Projectile animations for attacks
  * - Opponent intention animations
  * - Judge decree scrolls
  * - Status effect indicators
  * - Tier advancement celebrations
  *
- * @returns Object containing animation state arrays and trigger/cleanup functions
+ * Animations play sequentially based on priority:
+ * - Tier advancement: 100
+ * - Judge decree: 80
+ * - Projectile: 65
+ * - Opponent intention: 60
+ * - Status effect: 40
+ * - Particle effect: 20
+ *
+ * @returns Object containing animation queue state and trigger functions
  *
  * @example
  * ```tsx
@@ -91,19 +115,19 @@ export interface TierAdvancementAnimation {
  * // Trigger animation
  * battleEffects.triggerCardEffect(card, x, y);
  *
- * // Render containers
- * <ElementParticlesContainer
- *   effects={battleEffects.particleEffects}
- *   onEffectComplete={battleEffects.removeParticleEffect}
- * />
+ * // Render current animation
+ * {battleEffects.current?.type === 'intention' && (
+ *   <IntentionAnimation {...battleEffects.current.data} />
+ * )}
  * ```
  */
 export function useBattleEffects() {
-  const [particleEffects, setParticleEffects] = useState<ParticleEffect[]>([]);
-  const [intentionAnimations, setIntentionAnimations] = useState<IntentionAnimation[]>([]);
-  const [judgeDecreeAnimations, setJudgeDecreeAnimations] = useState<JudgeDecreeAnimation[]>([]);
-  const [statusEffectAnimations, setStatusEffectAnimations] = useState<StatusEffectAnimation[]>([]);
-  const [tierAdvancementAnimation, setTierAdvancementAnimation] = useState<TierAdvancementAnimation | null>(null);
+  const animQueue = useAnimationQueue();
+  const nextIdRef = useRef(1);
+
+  const getNextId = useCallback(() => {
+    return nextIdRef.current++;
+  }, []);
 
   /**
    * Triggers element particle burst when a card is played.
@@ -112,18 +136,52 @@ export function useBattleEffects() {
    * @param y - Screen Y coordinate for effect origin
    */
   const triggerCardEffect = useCallback((card: Card, x: number, y: number) => {
-    const effect: ParticleEffect = {
-      id: `card-${Date.now()}-${Math.random()}`,
-      element: card.element,
-      x,
-      y,
-      count: 30,
-      spread: 180,
-      velocity: 120,
-      duration: 1.2,
-    };
-    setParticleEffects(prev => [...prev, effect]);
-  }, []);
+    animQueue.enqueue({
+      id: `particle-${getNextId()}`,
+      type: 'particle',
+      priority: 20,
+      data: {
+        element: card.element,
+        x,
+        y,
+        count: 30,
+        spread: 180,
+        velocity: 120,
+        duration: 1.2,
+      },
+      duration: 1200,
+    });
+  }, [animQueue, getNextId]);
+
+  /**
+   * Triggers directional projectile animation.
+   * @param intentionType - Type of intention (determines icon)
+   * @param fromX - Starting X coordinate
+   * @param fromY - Starting Y coordinate
+   * @param toX - Target X coordinate
+   * @param toY - Target Y coordinate
+   */
+  const triggerProjectile = useCallback((
+    intentionType: IntentionType,
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number
+  ) => {
+    animQueue.enqueue({
+      id: `projectile-${getNextId()}`,
+      type: 'projectile',
+      priority: 65,
+      data: {
+        intentionType,
+        fromX,
+        fromY,
+        toX,
+        toY,
+      },
+      duration: 1100,
+    });
+  }, [animQueue, getNextId]);
 
   /**
    * Triggers full-screen intention animation when opponent acts.
@@ -138,15 +196,19 @@ export function useBattleEffects() {
     value: number,
     opponentName: string
   ) => {
-    const animation: IntentionAnimation = {
-      id: `intention-${Date.now()}-${Math.random()}`,
-      intentionName,
-      intentionType,
-      value,
-      opponentName,
-    };
-    setIntentionAnimations(prev => [...prev, animation]);
-  }, []);
+    animQueue.enqueue({
+      id: `intention-${getNextId()}`,
+      type: 'intention',
+      priority: 60,
+      data: {
+        intentionName,
+        intentionType,
+        value,
+        opponentName,
+      },
+      duration: 2000,
+    });
+  }, [animQueue, getNextId]);
 
   /**
    * Triggers imperial scroll animation for judge decrees.
@@ -154,13 +216,17 @@ export function useBattleEffects() {
    * @param description - Full text description of the decree effect
    */
   const triggerJudgeDecree = useCallback((decreeName: string, description: string) => {
-    const animation: JudgeDecreeAnimation = {
-      id: `decree-${Date.now()}-${Math.random()}`,
-      decreeName,
-      description,
-    };
-    setJudgeDecreeAnimations(prev => [...prev, animation]);
-  }, []);
+    animQueue.enqueue({
+      id: `decree-${getNextId()}`,
+      type: 'decree',
+      priority: 80,
+      data: {
+        decreeName,
+        description,
+      },
+      duration: 3000,
+    });
+  }, [animQueue, getNextId]);
 
   /**
    * Triggers floating status effect animation.
@@ -169,14 +235,18 @@ export function useBattleEffects() {
    * @param isPositive - True for buffs, false for debuffs
    */
   const triggerStatusEffect = useCallback((statusName: string, targetId: string, isPositive: boolean) => {
-    const animation: StatusEffectAnimation = {
-      id: `status-${Date.now()}-${Math.random()}`,
-      statusName,
-      targetId,
-      isPositive,
-    };
-    setStatusEffectAnimations(prev => [...prev, animation]);
-  }, []);
+    animQueue.enqueue({
+      id: `status-${getNextId()}`,
+      type: 'status',
+      priority: 40,
+      data: {
+        statusName,
+        targetId,
+        isPositive,
+      },
+      duration: 1500,
+    });
+  }, [animQueue, getNextId]);
 
   /**
    * Triggers celebration animation when player advances to a new tier.
@@ -184,73 +254,36 @@ export function useBattleEffects() {
    * @param tierName - Display name of the tier
    */
   const triggerTierAdvancement = useCallback((tierNumber: number, tierName: string) => {
-    const animation: TierAdvancementAnimation = {
-      id: `tier-${Date.now()}-${Math.random()}`,
-      tierNumber,
-      tierName,
-    };
-    setTierAdvancementAnimation(animation);
-  }, []);
-
-  /**
-   * Removes a completed particle effect from state.
-   * Called automatically by animation component after completion.
-   * @param id - Unique identifier of the effect to remove
-   */
-  const removeParticleEffect = useCallback((id: string) => {
-    setParticleEffects(prev => prev.filter(e => e.id !== id));
-  }, []);
-
-  /**
-   * Removes a completed intention animation from state.
-   * @param id - Unique identifier of the animation to remove
-   */
-  const removeIntentionAnimation = useCallback((id: string) => {
-    setIntentionAnimations(prev => prev.filter(a => a.id !== id));
-  }, []);
-
-  /**
-   * Removes a completed judge decree animation from state.
-   * @param id - Unique identifier of the animation to remove
-   */
-  const removeJudgeDecreeAnimation = useCallback((id: string) => {
-    setJudgeDecreeAnimations(prev => prev.filter(a => a.id !== id));
-  }, []);
-
-  /**
-   * Removes a completed status effect animation from state.
-   * @param id - Unique identifier of the animation to remove
-   */
-  const removeStatusEffectAnimation = useCallback((id: string) => {
-    setStatusEffectAnimations(prev => prev.filter(a => a.id !== id));
-  }, []);
-
-  /**
-   * Removes the tier advancement animation from state.
-   * @param id - Unique identifier of the animation to remove
-   */
-  const removeTierAdvancementAnimation = useCallback((id: string) => {
-    setTierAdvancementAnimation(prev => (prev?.id === id ? null : prev));
-  }, []);
+    animQueue.enqueue({
+      id: `tier-${getNextId()}`,
+      type: 'tier',
+      priority: 100,
+      data: {
+        tierNumber,
+        tierName,
+      },
+      duration: 4000,
+    });
+  }, [animQueue, getNextId]);
 
   return {
-    // State
-    particleEffects,
-    intentionAnimations,
-    judgeDecreeAnimations,
-    statusEffectAnimations,
-    tierAdvancementAnimation,
-    // Actions
+    // Animation queue state
+    current: animQueue.current,
+    queueLength: animQueue.queueLength,
+    isPlaying: animQueue.isPlaying,
+
+    // Queue controls
+    skip: animQueue.skip,
+    pause: animQueue.pause,
+    resume: animQueue.resume,
+    clear: animQueue.clear,
+
+    // Trigger functions
     triggerCardEffect,
+    triggerProjectile,
     triggerIntentionAnimation,
     triggerJudgeDecree,
     triggerStatusEffect,
     triggerTierAdvancement,
-    // Cleanup
-    removeParticleEffect,
-    removeIntentionAnimation,
-    removeJudgeDecreeAnimation,
-    removeStatusEffectAnimation,
-    removeTierAdvancementAnimation,
   };
 }

@@ -13,12 +13,15 @@ import TargetingOverlay from './battle/TargetingOverlay';
 // import EventAnnouncement from './battle/EventAnnouncement'; // Removed - animations show everything now
 import ActiveEffectsDisplay from './battle/ActiveEffectsDisplay';
 import PileViewerModal, { PileType } from './battle/PileViewerModal';
+import DetailModal from './battle/DetailModal';
+import CoreArgumentBadge from './battle/CoreArgumentBadge';
 import { ElementParticlesContainer } from '../effects/ElementParticles';
 import { IntentionAnimationContainer } from '../effects/IntentionAnimation';
 import { JudgeDecreeAnimationContainer } from '../effects/JudgeDecreeAnimation';
 import { StatusEffectAnimationContainer } from '../effects/StatusEffectAnimation';
 import { TierAdvancementAnimationContainer } from '../effects/TierAdvancementAnimation';
-import { GameState, Card, SessionState, TargetRequirement, GameEvent } from '../../types/game';
+import ProjectileAnimation from '../effects/ProjectileAnimation';
+import { GameState, Card, SessionState, TargetRequirement, GameEvent, CoreArgument } from '../../types/game';
 import { DebugInterface } from '../../hooks/useGameLogic';
 import { useBattleEffects } from '../../hooks/useBattleEffects';
 
@@ -63,6 +66,12 @@ export default function BattleArena({ onBack, session, state, playCard, endTurn,
     type: 'deck',
     isOpen: false,
   });
+
+  // Detail modal state for cards and core arguments
+  const [detailModal, setDetailModal] = useState<{
+    type: 'card' | 'core_argument';
+    data: Card | CoreArgument;
+  } | null>(null);
 
   const battleEffects = useBattleEffects();
   const previousOpponentsRef = useRef(state.opponents);
@@ -186,6 +195,19 @@ export default function BattleArena({ onBack, session, state, playCard, endTurn,
         onBack={onBack}
         backgroundClass={state.battleTheme?.background}
         wuxingIndicator={<WuxingIndicator lastElement={state.lastElement} harmonyStreak={state.harmonyStreak ?? 0} />}
+        coreArgumentBadge={
+          <CoreArgumentBadge
+            coreArgument={state.player.coreArgument}
+            onClick={() => {
+              if (state.player.coreArgument) {
+                setDetailModal({
+                  type: 'core_argument',
+                  data: state.player.coreArgument,
+                });
+              }
+            }}
+          />
+        }
         opponentPanel={
           <OpponentInfoPanel
             opponents={state.opponents}
@@ -238,6 +260,12 @@ export default function BattleArena({ onBack, session, state, playCard, endTurn,
             playerPoise={state.player.poise}
             gameState={state}
             onPlayCard={handlePlayCard}
+            onShowCardDetails={(card) => {
+              setDetailModal({
+                type: 'card',
+                data: card,
+              });
+            }}
             disabled={targeting?.isTargeting ?? false}
           />
         }
@@ -314,35 +342,73 @@ export default function BattleArena({ onBack, session, state, playCard, endTurn,
         onClose={closePileViewer}
       />
 
-      {/* Particle Effects */}
-      <ElementParticlesContainer
-        effects={battleEffects.particleEffects}
-        onEffectComplete={battleEffects.removeParticleEffect}
-      />
+      {/* Detail Modal (Card/Core Argument) */}
+      {detailModal && (
+        <DetailModal
+          type={detailModal.type}
+          data={detailModal.data}
+          state={detailModal.type === 'card' ? state : undefined}
+          onClose={() => setDetailModal(null)}
+        />
+      )}
 
-      {/* Intention Animations */}
-      <IntentionAnimationContainer
-        animations={battleEffects.intentionAnimations}
-        onAnimationComplete={battleEffects.removeIntentionAnimation}
-      />
+      {/* Animation Queue - Sequential Playback */}
+      {battleEffects.current && (
+        <>
+          {/* Projectile Animation */}
+          {battleEffects.current.type === 'projectile' && (
+            <ProjectileAnimation
+              isActive={true}
+              intentionType={battleEffects.current.data.intentionType}
+              fromX={battleEffects.current.data.fromX}
+              fromY={battleEffects.current.data.fromY}
+              toX={battleEffects.current.data.toX}
+              toY={battleEffects.current.data.toY}
+              onComplete={battleEffects.skip}
+            />
+          )}
 
-      {/* Judge Decree Animations */}
-      <JudgeDecreeAnimationContainer
-        animations={battleEffects.judgeDecreeAnimations}
-        onAnimationComplete={battleEffects.removeJudgeDecreeAnimation}
-      />
+          {/* Particle Effects */}
+          {battleEffects.current.type === 'particle' && (
+            <ElementParticlesContainer
+              effects={[battleEffects.current.data]}
+              onEffectComplete={battleEffects.skip}
+            />
+          )}
 
-      {/* Status Effect Animations */}
-      <StatusEffectAnimationContainer
-        animations={battleEffects.statusEffectAnimations}
-        onAnimationComplete={battleEffects.removeStatusEffectAnimation}
-      />
+          {/* Intention Animations */}
+          {battleEffects.current.type === 'intention' && (
+            <IntentionAnimationContainer
+              animations={[battleEffects.current.data]}
+              onAnimationComplete={battleEffects.skip}
+            />
+          )}
 
-      {/* Tier Advancement Animation */}
-      <TierAdvancementAnimationContainer
-        animation={battleEffects.tierAdvancementAnimation}
-        onAnimationComplete={battleEffects.removeTierAdvancementAnimation}
-      />
+          {/* Judge Decree Animations */}
+          {battleEffects.current.type === 'decree' && (
+            <JudgeDecreeAnimationContainer
+              animations={[battleEffects.current.data]}
+              onAnimationComplete={battleEffects.skip}
+            />
+          )}
+
+          {/* Status Effect Animations */}
+          {battleEffects.current.type === 'status' && (
+            <StatusEffectAnimationContainer
+              animations={[battleEffects.current.data]}
+              onAnimationComplete={battleEffects.skip}
+            />
+          )}
+
+          {/* Tier Advancement Animation */}
+          {battleEffects.current.type === 'tier' && (
+            <TierAdvancementAnimationContainer
+              animation={battleEffects.current.data}
+              onAnimationComplete={battleEffects.skip}
+            />
+          )}
+        </>
+      )}
     </>
   );
 }

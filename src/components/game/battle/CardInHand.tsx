@@ -21,6 +21,7 @@ interface CardInHandProps {
   gameState: GameState;
   onPlay: (card: Card) => void;
   onHover: (index: number | null) => void;
+  onShowDetails?: (card: Card) => void;
 }
 
 const ELEMENT_BORDERS: Record<Element, string> = {
@@ -52,6 +53,7 @@ const CardInHand = forwardRef<HTMLDivElement, CardInHandProps>(function CardInHa
   gameState,
   onPlay,
   onHover,
+  onShowDetails,
 }, ref) {
   const isBadCard = card.isBad === true;
   // Keep element colors even for bad cards
@@ -115,6 +117,10 @@ const CardInHand = forwardRef<HTMLDivElement, CardInHandProps>(function CardInHa
           rotate: [0, -5, 5, 0],
         } : {}}
         onClick={() => canAfford && onPlay(card)}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          onShowDetails?.(card);
+        }}
         onMouseEnter={() => onHover(index)}
         onMouseLeave={() => onHover(null)}
         disabled={!canAfford}

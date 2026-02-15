@@ -5,6 +5,7 @@ interface BattleLayoutProps {
   onBack: () => void;
   // Top left
   wuxingIndicator: React.ReactNode;
+  coreArgumentBadge?: React.ReactNode;
   // Top right
   opponentPanel: React.ReactNode;
   // Center
@@ -28,6 +29,7 @@ interface BattleLayoutProps {
 export default function BattleLayout({
   onBack,
   wuxingIndicator,
+  coreArgumentBadge,
   opponentPanel,
   judgePanel,
   playerPanel,
@@ -46,15 +48,18 @@ export default function BattleLayout({
 
       {/* Top Row */}
       <div className="relative z-10 flex items-start justify-between p-4 pb-0 shrink-0">
-        {/* Top Left: Back button + Wuxing */}
-        <div className="flex items-start gap-3">
-          <button
-            onClick={onBack}
-            className="p-2 hover:bg-stone-800 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          {wuxingIndicator}
+        {/* Top Left: Back button + Wuxing + Core Argument */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-start gap-3">
+            <button
+              onClick={onBack}
+              className="p-2 hover:bg-stone-800 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            {wuxingIndicator}
+          </div>
+          {coreArgumentBadge}
         </div>
 
         {/* Top Center: Campaign Progress */}

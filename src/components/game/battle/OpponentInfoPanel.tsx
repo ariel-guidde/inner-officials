@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Swords, Hourglass, Zap, HelpCircle, TrendingDown, TrendingUp, Target, Crosshair } from 'lucide-react';
 import { Intention, JudgeEffects, INTENTION_TYPE, IntentionType, TierDefinition, Opponent } from '../../../types/game';
 import { SPRING_PRESETS } from '../../../lib/animations/constants';
+import { getStatusIcon, getStatusColor, getStatusTextColor } from '../../../lib/statusIcons';
+import { getStatusTemplate } from '../../../data/statusTemplates';
 
 interface OpponentInfoPanelProps {
   opponents: Opponent[];
@@ -68,10 +70,8 @@ function SingleOpponentPanel({
 
   const getDisplayedValue = (intention: Intention | null): number => {
     if (!intention) return 0;
-    if (intention.type === INTENTION_TYPE.ATTACK) {
-      return Math.floor(intention.value * judgeEffects.damageModifier);
-    }
-    return intention.value;
+    // Use pre-calculated displayValue if available (includes all modifiers)
+    return intention.displayValue ?? intention.value;
   };
 
   const getIntentionDescription = (intention: Intention | null) => {
@@ -85,6 +85,7 @@ function SingleOpponentPanel({
 
   return (
     <motion.div
+      data-opponent-panel
       animate={isSelectable ? {
         scale: [1, 1.05, 1],
         boxShadow: [
@@ -174,25 +175,65 @@ function SingleOpponentPanel({
         </div>
       )}
 
-      {/* Opponent Statuses */}
+      {/* Opponent Statuses - Icon Display */}
       {opponent.statuses.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-1">
-          {opponent.statuses.map(status => (
-            <div
-              key={status.id}
-              className={`px-1.5 py-0.5 rounded text-[10px] border ${
-                status.isPositive
-                  ? 'border-green-600/50 bg-green-900/30 text-green-300'
-                  : 'border-red-600/50 bg-red-900/30 text-red-300'
-              }`}
-              title={status.description}
-            >
-              {status.name}
-              {status.triggersRemaining !== undefined && (
-                <span className="ml-0.5 opacity-60">{status.triggersRemaining}x</span>
-              )}
-            </div>
-          ))}
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {(() => {
+            // Group statuses by templateId
+            const statusGroups: Record<string, { statuses: typeof opponent.statuses, count: number, maxTurns: number, maxTriggers: number }> = {};
+            opponent.statuses.forEach(status => {
+              const key = status.templateId || status.id;
+              if (!statusGroups[key]) {
+                statusGroups[key] = { statuses: [], count: 0, maxTurns: status.turnsRemaining, maxTriggers: status.triggersRemaining || 0 };
+              }
+              statusGroups[key].statuses.push(status);
+              statusGroups[key].count++;
+              statusGroups[key].maxTurns = Math.max(statusGroups[key].maxTurns, status.turnsRemaining);
+              if (status.triggersRemaining !== undefined) {
+                statusGroups[key].maxTriggers = Math.max(statusGroups[key].maxTriggers, status.triggersRemaining);
+              }
+            });
+
+            return Object.entries(statusGroups).map(([templateId, group]) => {
+              const template = getStatusTemplate(templateId);
+              const firstStatus = group.statuses[0];
+              const Icon = getStatusIcon(templateId);
+              const isPositive = template?.isPositive ?? firstStatus.isPositive;
+
+              return (
+                <div key={templateId} className="relative group">
+                  {/* Icon circle */}
+                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${getStatusColor(isPositive)}`}>
+                    <Icon className={`w-3 h-3 ${getStatusTextColor(isPositive)}`} />
+                  </div>
+
+                  {/* Count badge */}
+                  {group.count > 1 && (
+                    <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-stone-700 rounded-full text-[8px] flex items-center justify-center font-bold text-stone-200 border border-stone-600">
+                      {group.count}
+                    </div>
+                  )}
+
+                  {/* Turn/trigger badge */}
+                  {(group.maxTurns > 0 || group.maxTriggers > 0) && (
+                    <div className="absolute -bottom-0.5 -right-0.5 min-w-[14px] h-3.5 bg-stone-600 rounded-full text-[8px] flex items-center justify-center font-bold text-stone-200 border border-stone-500 px-0.5">
+                      {group.maxTurns > 0 && `${group.maxTurns}t`}
+                      {group.maxTriggers > 0 && `${group.maxTriggers}x`}
+                    </div>
+                  )}
+
+                  {/* Hover tooltip */}
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 hidden group-hover:block z-50 pointer-events-none">
+                    <div className="bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-xs whitespace-nowrap shadow-xl">
+                      <div className="font-bold text-stone-100">{template?.name || firstStatus.name}</div>
+                      <div className="text-stone-400 text-[10px] mt-0.5">{template?.description || firstStatus.description}</div>
+                      {group.count > 1 && <div className="text-[10px] mt-1 text-stone-500">×{group.count} stacks</div>}
+                    </div>
+                  </div>
+                </div>
+              );
+            });
+          })()}
         </div>
       )}
 
